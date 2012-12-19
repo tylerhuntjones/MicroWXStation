@@ -1,7 +1,7 @@
 #include <string.h>
 #include <Wire.h>
 #include <dht.h>
-#include <PCD8544.h>
+//#include <PCD8544.h>
 #include <Adafruit_BMP085.h>
 #include <LiquidCrystal.h>
 
@@ -65,7 +65,7 @@ double MinDewPoint = 120;
 double MaxDewPoint = 0;
 
 // DHT22 Config
-#define DHT22_PIN 8
+#define DHT22_PIN 7
 dht DHT;
 
 // BMP085 COnfiguration
@@ -171,10 +171,12 @@ void setup(void)
   lcd.print("v0.1 (HW rev 1)");
   lcd.setCursor(0,1);
   lcd.print("Tyler Jones (thj.me)");
-  for(int i=2;i<9;i++) {
-    lcd.setCursor(i,2);
+  lcd.setCursor(0,3);
+  lcd.print("Loading");  
+  for(int i=7;i<20;i++) {
+    lcd.setCursor(i,3);
     lcd.print(".");  
-    delay(110); 
+    delay(200); 
   }
   delay(2000);
   lcd.clear();
@@ -642,24 +644,24 @@ void GLCD_showAllData() {
 
 void LCD_showAllData() { // Show all current weather data on the infomation LCD (4x20)
   lcd.setCursor(0,0);
-  lcd.print("Temp:                ");
+  lcd.print("Temp:               ");
   lcd.setCursor(6,0);  
   lcd.print(temperature);
   lcd.print(" *F");
   lcd.setCursor(0,2);
-  lcd.print("Pressure:            ");
+  lcd.print("Pressure:           ");
   lcd.setCursor(10,2);  
   lcd.print((double)pressure);
   lcd.setCursor(0,1);
-  lcd.print("Humidity:            ");
+  lcd.print("Humidity:           ");
   lcd.setCursor(10,1);  
   lcd.print(humidity);
   lcd.print("%");
   lcd.setCursor(0,3);
-  lcd.print("DewPoint:            ");
+  lcd.print("DewPoint:           ");
   lcd.setCursor(10,3);  
   lcd.print(dewpoint);
-  lcd.print(" *F");
+  lcd.print(" F");
 }
 // ------------------------------------------------------------------------------
 // Metorlogical Calculations Functions
