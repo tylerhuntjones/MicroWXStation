@@ -15,11 +15,14 @@
 #define LCD_HEIGHT 48
 
 // LCD (4x20) Configuration
-LiquidCrystal lcd(13, 12, 11, 10, 9, 7, 6, 1, 0, 19);
+LiquidCrystal lcd(33, 31, 29, 27 ,25, 23, 32, 30, 28, 26);
 
 // The number of lines for the temperature chart...
 #define CHART_HEIGHT 4
 #define CHART_MIN_TEMP 15
+
+
+
 #define CHART_MAX_TEMP 80
 #define TEMPCHART_UPDATE_THRESHOLD 6
 // A custom "degrees" symbol...
@@ -85,17 +88,17 @@ float altitude;     // Altitude
 // Button Pins
 #define BTN_CHART_NEXT 16
 #define BTN_VIEW_DATA 17
-#define BTN_UP 5
-#define BTN_DOWN 4
-#define BTN_MENU_SELECT 3
-#define BTN_BACK 2
-#define SWITCH_UNITS 18
+#define BTN_INC 24  // Increment
+#define BTN_DEC 22  // Decrement
+#define BTN_MENU 34
+#define BTN_SELECT 36
+#define SWITCH_UNITS 38
 #define BTN_PRESSHOLD_DUR 1250
 
 // Button debounce variables
 int lastbtnChartNext_state = 0;
 int lastbtnViewAllData_state = 0;
-int lastbtnBack_state = 0;
+int lastbtnMenu_state = 0;
 int lastbtnSelect_state = 0;
 int lastbtnUp_state = 0;
 int lastbtnDown_state = 0;
@@ -358,12 +361,12 @@ void loop(void)
   }
   
   // LCD Buttons Handling
-  int btnBack_state = digitalRead(BTN_BACK);
-  int btnSelect_state = digitalRead(BTN_MENU_SELECT);
-  if(btnSelect_state == LOW || btnBack_state == LOW) { 
+  int btnMenu_state = digitalRead(BTN_MENU);
+  int btnSelect_state = digitalRead(BTN_SELECT);
+  if(btnSelect_state == LOW || btnMenu_state == LOW) { 
     Buttons_Pressed_Time = 0; 
   }
-  if(btnSelect_state == HIGH && btnBack_state == HIGH) { 
+  if(btnSelect_state == HIGH && btnMenu_state == HIGH) { 
     if(Buttons_Pressed_Time == 0) { 
       Buttons_Pressed_Time = millis(); 
     }
@@ -373,11 +376,11 @@ void loop(void)
       delay(1000);
     }
   } else { 
-    if(btnBack_state != lastbtnBack_state) {
-      if(btnBack_state == HIGH) {
-        Serial.println("Back Button PRESSED!");
+    if(btnMenu_state != lastbtnMenu_state) {
+      if(btnMenu_state == HIGH) {
+        Serial.println("Menu Button PRESSED!");
       } else {
-        Serial.println("Back Button RELEASED!");
+        Serial.println("Menu Button RELEASED!");
       }
     }
     if(btnSelect_state != lastbtnSelect_state) {
@@ -388,11 +391,11 @@ void loop(void)
        }
       }
     lastbtnSelect_state = btnSelect_state;
-    lastbtnBack_state = btnBack_state;
+    lastbtnMenu_state = btnMenu_state;
   }
     // LCD Buttons Handling
-  int btnDown_state = digitalRead(BTN_DOWN);
-  int btnUp_state = digitalRead(BTN_UP);
+  int btnDown_state = digitalRead(BTN_DEC);
+  int btnUp_state = digitalRead(BTN_INC);
   if(btnDown_state == LOW || btnUp_state == LOW) { 
     Buttons_Pressed_Time = 0; 
   }
