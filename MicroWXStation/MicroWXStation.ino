@@ -52,6 +52,16 @@ String UnitAbbr = " C";
 #define SW_UNITS 38
 #define BTN_PRESSHOLD_DUR 1250
 
+// LED Pins
+#define LED_STS_OK 9 //Small green led
+#define LED_STS_ERROR 8 //Small red led
+#define LED_UPDATE_INTERVAL 10
+#define LED_RGB_RED 11
+#define LED_RGB_GRN 12
+#define LED_RGB_BLUE 13
+#define LED_LOG_STS_RED 2
+#define LED_LOG_STS_GRN 3
+
 // Button debounce variables
 int btnMenu_lastS = 0;
 int btnSelect_lastS = 0;
@@ -101,6 +111,16 @@ void setup(void)
   pinMode(SW_UNITS, INPUT);
   pinMode(53, OUTPUT);
   
+  // Setup LED pins
+  pinMode(LED_STS_OK, OUTPUT);
+  pinMode(LED_STS_ERROR, OUTPUT);
+  pinMode(LED_UPDATE_INTERVAL, OUTPUT);
+  pinMode(LED_RGB_RED, OUTPUT);
+  pinMode(LED_RGB_GRN, OUTPUT);
+  pinMode(LED_RGB_BLUE, OUTPUT);
+  pinMode(LED_LOG_STS_RED, OUTPUT);
+  pinMode(LED_LOG_STS_GRN, OUTPUT);
+    
     // we'll use the initialization code from the utility libraries
   // since we're just testing if the card is working!
   if (!card.init(SPI_QUARTER_SPEED, chipSelect)) {
@@ -158,8 +178,7 @@ void setup(void)
  
   // list all files in the card with date and size
   root.ls(LS_R | LS_DATE | LS_SIZE);
-  
--t5 (
+
 
   // Setup 4x20 LCD
   lcd.begin(20, 4);
@@ -169,6 +188,126 @@ void setup(void)
 	Serial.println("*** No BMP085 barometer sensor found! Check wiring and try again! ***");
 	while (1) {}
   }
+  
+  //------------------------------------------
+  
+  // Test LEDs
+  digitalWrite(LED_UPDATE_INTERVAL, ON);
+  lcd.setCursor(0,0);
+  lcd.print("Status OK LED ON");
+  digitalWrite(LED_STS_OK, ON);
+  delay(50);
+  digitalWrite(LED_UPDATE_INTERVAL, OFF);
+  delay(500);
+  
+  digitalWrite(LED_UPDATE_INTERVAL, ON);
+  lcd.setCursor(0,2);
+  lcd.print("Status Err LED ON");
+  digitalWrite(LED_STS_ERROR, ON);
+  delay(50);
+  digitalWrite(LED_UPDATE_INTERVAL, OFF);
+  delay(500);
+  
+  digitalWrite(LED_UPDATE_INTERVAL, ON);
+  lcd.setCursor(0,1);
+  lcd.print("Logging LED Test: GRN");
+  digitalWrite(LED_LOG_STS_GRN, ON);
+  delay(50);
+  digitalWrite(LED_UPDATE_INTERVAL, OFF);
+  delay(500);
+  digitalWrite(LED_LOG_STS_GRN, OFF);
+  delay(250);
+  lcd.setCursor(0,1);
+  lcd.print("Logging LED Test: GRN");
+  digitalWrite(LED_LOG_STS_GRN, ON);
+  delay(250);
+  digitalWrite(LED_LOG_STS_GRN, OFF);
+  lcd.setCursor(0,1);
+  lcd.print("Logging LED Test: RED");
+  digitalWrite(LED_LOG_STS_RED, ON);
+  delay(250);
+  digitalWrite(LED_LOG_STS_GRN, ON);
+  lcd.setCursor(0,1);
+  lcd.print("Logging LED Test: GRN");
+  digitalWrite(LED_LOG_STS_RED, OFF);
+  delay(500);
+  digitalWrite(LED_LOG_STS_GRN, ON);
+  
+  digitalWrite(LED_UPDATE_INTERVAL, ON);
+  lcd.setCursor(0,3);
+  lcd.print("Logging LED: ERR");
+  digitalWrite(LED_LOG_STS_RED, ON);
+  delay(50);
+  digitalWrite(LED_UPDATE_INTERVAL, OFF);
+  delay(500);
+  delay(500);
+  digitalWrite(LED_STS_OK, OFF);
+  digitalWrite(LED_STS_ERROR, OFF);
+  digitalWrite(LED_LOG_STS_GRN, OFF);
+  digitalWrite(LED_LOG_STS_RED, OFF);
+  lcd.clear();
+  
+  digitalWrite(LED_UPDATE_INTERVAL, ON);
+  lcd.setCursor(0,0);
+  lcd.print("RGB LED: RED");
+  digitalWrite(LED_RGB_RED, ON);
+  delay(50);
+  digitalWrite(LED_UPDATE_INTERVAL, OFF);
+  delay(500);
+  digitalWrite(LED_RGB_RED, OFF);
+  
+  digitalWrite(LED_UPDATE_INTERVAL, ON);
+  lcd.setCursor(0,2);
+  lcd.print("RGB LED: RED");
+  digitalWrite(LED_RGB_GRN, ON);
+  delay(50);
+  digitalWrite(LED_UPDATE_INTERVAL, OFF);
+  delay(500);
+  digitalWrite(LED_RGB_GRN, OFF);
+  
+  digitalWrite(LED_UPDATE_INTERVAL, ON);
+  lcd.setCursor(0,1);
+  lcd.print("RGB LED: BLUE");
+  digitalWrite(LED_RGB_BLUE, ON);
+  delay(50);
+  digitalWrite(LED_UPDATE_INTERVAL, OFF);
+  delay(500);
+  digitalWrite(LED_RGB_BLUE, OFF);
+  delay(500);
+  
+  digitalWrite(LED_UPDATE_INTERVAL, ON);
+  lcd.setCursor(0,0);
+  lcd.print("RGB LED: RED");
+  digitalWrite(LED_RGB_RED, ON);
+  delay(50);
+  digitalWrite(LED_UPDATE_INTERVAL, OFF);
+  delay(500);
+  
+  digitalWrite(LED_UPDATE_INTERVAL, ON);
+  lcd.setCursor(0,2);
+  lcd.print("RGB LED: RED");
+  digitalWrite(LED_RGB_GRN, ON);
+  delay(50);
+  digitalWrite(LED_UPDATE_INTERVAL, OFF);
+  delay(500);
+  
+  digitalWrite(LED_UPDATE_INTERVAL, ON);
+  lcd.setCursor(0,1);
+  lcd.print("RGB LED: BLUE");
+  digitalWrite(LED_RGB_BLUE, ON);
+  delay(50);
+  digitalWrite(LED_UPDATE_INTERVAL, OFF);
+  delay(500);
+  delay(500);
+  
+  digitalWrite(LED_RGB_RED, OFF);
+  digitalWrite(LED_RGB_GRN, OFF);
+  digitalWrite(LED_RGB_BLUE, OFF);
+  
+  lcd.clear();
+  
+  //------------------------------------------
+  
   lcd.setCursor(0,0);
   lcd.print("MicroWXStation");
   lcd.setCursor(0,2);
@@ -191,8 +330,7 @@ void setup(void)
 
 void loop(void)
 {
-  //Serial.println("--------------------");
-  
+ 
   UINT_DHT++;
   if(UINT_DHT > UTHOLD_DHT) {
     UINT_DHT= 0;
@@ -203,18 +341,18 @@ void loop(void)
         //Serial.println("DHT22 - OK,\t");
         break;
       case DHTLIB_ERROR_CHECKSUM:
-        Serial.println("DHT22 - Checksum error,\t");
-        lcd.print("Hgm/Thermo FAIL!");
+        Serial.println("DHT22 Checksum err,\t");
+        lcd.print("DHT22 FAIL!");
         delay(2000);
         break;
       case DHTLIB_ERROR_TIMEOUT:
-        Serial.println("DHT22 - Time out error,\t");
-        lcd.print("Hgm/Thermo FAIL!");
+        Serial.println("DHT22 Time out err,\t");
+        lcd.print("DHT22 FAIL!");
         delay(2000);
         break;
       default:
-        Serial.println("DHT22 - Unknown error,\t");
-        lcd.print("Hgm/Thermo FAIL!");
+        Serial.println("DHT22 Unknown err,\t");
+        lcd.print("DHT22 FAIL!");
         delay(2000);
         break;
     }
@@ -369,7 +507,7 @@ void loop(void)
    if(UINT_SD > UTHOLD_SD) {
     //Create Data string for storing to SD card
     //We will use CSV Format  
-    String dataString = String(id) + ", " + String(T.dht_c) + ", " + String(humidity) + ", " + String(pressure) + ", " + String(dewPointFast(T.dht_c, humidity)); 
+    String dataString = String(id) + ", " + String((int)(T.dht_c*100)) + ", " + String((int)humidity) + ", " + String((int)(pressure*10)) + ", " + String((int)(dewPointFast(T.dht_c, humidity)*100)); 
     
     //Open a file to write to
     //Only one file can be open at a time
@@ -382,6 +520,7 @@ void loop(void)
     }
     else
     {
+      
       Serial.println("Couldn't open log file");
     }
     
