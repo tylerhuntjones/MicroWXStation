@@ -8,6 +8,8 @@
 //General Definitions
 #define ON HIGH
 #define OFF LOW
+#define SDENABLE false
+#define BOOT_DELAY_INTERVAL 400
 
 // LCD (4x20) Configuration
 LiquidCrystal lcd(33, 31, 29, 27 ,25, 23, 32, 30, 28, 26);
@@ -53,20 +55,23 @@ String UnitAbbr = " C";
 #define BTN_PRESSHOLD_DUR 1250
 
 // LED Pins
-#define LED_STS_OK 9 //Small green led
-#define LED_STS_ERROR 8 //Small red led
-#define LED_UPDATE_INTERVAL 10
-#define LED_RGB_RED 11
-#define LED_RGB_GRN 12
-#define LED_RGB_BLUE 13
+#define LED_STS_OK 8 //Small green led
+//#define LED_STS_ERR  //Small red led
+#define LED_UPDATE_INTERVAL 9
+#define LED_RGB_RED 10
+#define LED_RGB_GRN 11
+#define LED_RGB_BLUE 12
 #define LED_LOG_STS_RED 2
 #define LED_LOG_STS_GRN 3
 
+//Error handling variables
+boolean DisableDHT22 = false;
+
 // Button debounce variables
-int btnMenu_lastS = 0;
-int btnSelect_lastS = 0;
-int btnUp_lastS = 0;
-int btnDown_lastS = 0;
+int btnMenu_LS = 0;
+int btnSelect_LS = 0;
+int btnUp_LS = 0;
+int btnDown_LS = 0;
 int Buttons_Pressed_Time = 0; //Time in milliseconds
 
 //Enum for holding the current view for the GLCD
@@ -113,7 +118,7 @@ void setup(void)
   
   // Setup LED pins
   pinMode(LED_STS_OK, OUTPUT);
-  pinMode(LED_STS_ERROR, OUTPUT);
+  //pinMode(LED_STS_ERR, OUTPUT);
   pinMode(LED_UPDATE_INTERVAL, OUTPUT);
   pinMode(LED_RGB_RED, OUTPUT);
   pinMode(LED_RGB_GRN, OUTPUT);
@@ -123,205 +128,124 @@ void setup(void)
     
     // we'll use the initialization code from the utility libraries
   // since we're just testing if the card is working!
-  if (!card.init(SPI_QUARTER_SPEED, chipSelect)) {
-    Serial.println("initialization failed. Things to check:");
-    Serial.println("* is a card is inserted?");
-    Serial.println("* Is your wiring correct?");
-    Serial.println("* did you change the chipSelect pin to match your shield or module?");
-    return;
-  } else {
-   Serial.println("Wiring is correct and a card is present.");
+  if(SDENABLE) {
+    if (!card.init(SPI_QUARTER_SPEED, chipSelect)) {
+      Serial.println("initialization failed. Things to check:");
+      Serial.println("* is a card is inserted?");
+      Serial.println("* Is your wiring correct?");
+      Serial.println("* did you change the chipSelect pin to match your shield or module?");
+      return;
+    } else {
+     Serial.println("Wiring is correct and a card is present.");
+    }
+   
+    // print the type of card
+    Serial.print("\nCard type: ");
+    switch(card.type()) {
+      case SD_CARD_TYPE_SD1:
+        Serial.println("SD1");
+        break;
+      case SD_CARD_TYPE_SD2:
+        Serial.println("SD2");
+        break;
+      case SD_CARD_TYPE_SDHC:
+        Serial.println("SDHC");
+        break;
+      default:
+        Serial.println("Unknown");
+    }
+   
+    // Now we will try to open the 'volume'/'partition' - it should be FAT16 or FAT32
+    if (!volume.init(card)) {
+      Serial.println("Could not find FAT16/FAT32 partition.\nMake sure you've formatted the card");
+      return;
+    }
+   
+    // print the type and size of the first FAT-type volume
+    long volumesize;
+    Serial.print("\nVolume type is FAT");
+    Serial.println(volume.fatType(), DEC);
+    Serial.println();
+   
+    volumesize = volume.blocksPerCluster();    // clusters are collections of blocks
+    volumesize *= volume.clusterCount();       // we'll have a lot of clusters
+    volumesize *= 512;                            // SD card blocks are always 512 bytes
+    Serial.print("Volume size (bytes): ");
+    Serial.println(volumesize);
+    Serial.print("Volume size (Kbytes): ");
+    volumesize /= 1024;
+    Serial.println(volumesize);
+    Serial.print("Volume size (Mbytes): ");
+    volumesize /= 1024;
+    Serial.println(volumesize);
+   
+    Serial.println("\nFiles found on the card (name, date and size in bytes): ");
+    root.openRoot(volume);
+   
+    // list all files in the card with date and size
+    root.ls(LS_R | LS_DATE | LS_SIZE);
   }
- 
-  // print the type of card
-  Serial.print("\nCard type: ");
-  switch(card.type()) {
-    case SD_CARD_TYPE_SD1:
-      Serial.println("SD1");
-      break;
-    case SD_CARD_TYPE_SD2:
-      Serial.println("SD2");
-      break;
-    case SD_CARD_TYPE_SDHC:
-      Serial.println("SDHC");
-      break;
-    default:
-      Serial.println("Unknown");
-  }
- 
-  // Now we will try to open the 'volume'/'partition' - it should be FAT16 or FAT32
-  if (!volume.init(card)) {
-    Serial.println("Could not find FAT16/FAT32 partition.\nMake sure you've formatted the card");
-    return;
-  }
- 
-  // print the type and size of the first FAT-type volume
-  long volumesize;
-  Serial.print("\nVolume type is FAT");
-  Serial.println(volume.fatType(), DEC);
-  Serial.println();
- 
-  volumesize = volume.blocksPerCluster();    // clusters are collections of blocks
-  volumesize *= volume.clusterCount();       // we'll have a lot of clusters
-  volumesize *= 512;                            // SD card blocks are always 512 bytes
-  Serial.print("Volume size (bytes): ");
-  Serial.println(volumesize);
-  Serial.print("Volume size (Kbytes): ");
-  volumesize /= 1024;
-  Serial.println(volumesize);
-  Serial.print("Volume size (Mbytes): ");
-  volumesize /= 1024;
-  Serial.println(volumesize);
- 
-  Serial.println("\nFiles found on the card (name, date and size in bytes): ");
-  root.openRoot(volume);
- 
-  // list all files in the card with date and size
-  root.ls(LS_R | LS_DATE | LS_SIZE);
-
-
+  
   // Setup 4x20 LCD
   lcd.begin(20, 4);
   lcd.clear();
   if (!bmp.begin()) { // Setup BMP085 Barometer
-        lcd.print("Barometer FAIL!");
+        lcdprint("Barometer FAIL!", -1);
 	Serial.println("*** No BMP085 barometer sensor found! Check wiring and try again! ***");
-	while (1) {}
+        lcdprint("Sensor not found!", 1);
+        lcdprint("****FATAL ERROR*****", 2);
+        lcdprint("Syetem halted!",3);
+	while (1) { delay(10); }
   }
-  
+    
   //------------------------------------------
-  
+  int j = 7;
+  lcdprint("MicroWXStation", 0);
+  lcdprint("v0.2.1 (HW rev 3)", 1);
+  lcdprint("By: Tyler H. Jones", 2);
+  lcdprint("Loading", 3);
+  // THe RGB LED is activated when LOW rather than HIGH
+  digitalWrite(LED_RGB_RED, ON);
+  digitalWrite(LED_RGB_GRN, ON);
+  digitalWrite(LED_RGB_BLUE, ON);
+  lcd.setCursor(j,3); j++;
+  lcd.print(".");  
+  delay(BOOT_DELAY_INTERVAL / 2); 
+  lcd.setCursor(j,3); j++;
+  lcd.print("."); 
+  //------------------------------------------
   // Test LEDs
-  digitalWrite(LED_UPDATE_INTERVAL, ON);
-  lcd.setCursor(0,0);
-  lcd.print("Status OK LED ON");
   digitalWrite(LED_STS_OK, ON);
-  delay(50);
-  digitalWrite(LED_UPDATE_INTERVAL, OFF);
-  delay(500);
-  
-  digitalWrite(LED_UPDATE_INTERVAL, ON);
-  lcd.setCursor(0,2);
-  lcd.print("Status Err LED ON");
-  digitalWrite(LED_STS_ERROR, ON);
-  delay(50);
-  digitalWrite(LED_UPDATE_INTERVAL, OFF);
-  delay(500);
-  
-  digitalWrite(LED_UPDATE_INTERVAL, ON);
-  lcd.setCursor(0,1);
-  lcd.print("Logging LED Test: GRN");
-  digitalWrite(LED_LOG_STS_GRN, ON);
-  delay(50);
-  digitalWrite(LED_UPDATE_INTERVAL, OFF);
-  delay(500);
-  digitalWrite(LED_LOG_STS_GRN, OFF);
-  delay(250);
-  lcd.setCursor(0,1);
-  lcd.print("Logging LED Test: GRN");
-  digitalWrite(LED_LOG_STS_GRN, ON);
-  delay(250);
-  digitalWrite(LED_LOG_STS_GRN, OFF);
-  lcd.setCursor(0,1);
-  lcd.print("Logging LED Test: RED");
-  digitalWrite(LED_LOG_STS_RED, ON);
-  delay(250);
-  digitalWrite(LED_LOG_STS_GRN, ON);
-  lcd.setCursor(0,1);
-  lcd.print("Logging LED Test: GRN");
-  digitalWrite(LED_LOG_STS_RED, OFF);
-  delay(500);
-  digitalWrite(LED_LOG_STS_GRN, ON);
-  
-  digitalWrite(LED_UPDATE_INTERVAL, ON);
-  lcd.setCursor(0,3);
-  lcd.print("Logging LED: ERR");
-  digitalWrite(LED_LOG_STS_RED, ON);
-  delay(50);
-  digitalWrite(LED_UPDATE_INTERVAL, OFF);
-  delay(500);
-  delay(500);
-  digitalWrite(LED_STS_OK, OFF);
-  digitalWrite(LED_STS_ERROR, OFF);
-  digitalWrite(LED_LOG_STS_GRN, OFF);
-  digitalWrite(LED_LOG_STS_RED, OFF);
-  lcd.clear();
-  
-  digitalWrite(LED_UPDATE_INTERVAL, ON);
-  lcd.setCursor(0,0);
-  lcd.print("RGB LED: RED");
-  digitalWrite(LED_RGB_RED, ON);
-  delay(50);
-  digitalWrite(LED_UPDATE_INTERVAL, OFF);
-  delay(500);
+  lcd.setCursor(j,3); j++;
+  lcd.print(".");  
   digitalWrite(LED_RGB_RED, OFF);
-  
-  digitalWrite(LED_UPDATE_INTERVAL, ON);
-  lcd.setCursor(0,2);
-  lcd.print("RGB LED: RED");
-  digitalWrite(LED_RGB_GRN, ON);
-  delay(50);
-  digitalWrite(LED_UPDATE_INTERVAL, OFF);
-  delay(500);
-  digitalWrite(LED_RGB_GRN, OFF);
-  
-  digitalWrite(LED_UPDATE_INTERVAL, ON);
-  lcd.setCursor(0,1);
-  lcd.print("RGB LED: BLUE");
-  digitalWrite(LED_RGB_BLUE, ON);
-  delay(50);
-  digitalWrite(LED_UPDATE_INTERVAL, OFF);
-  delay(500);
-  digitalWrite(LED_RGB_BLUE, OFF);
-  delay(500);
-  
-  digitalWrite(LED_UPDATE_INTERVAL, ON);
-  lcd.setCursor(0,0);
-  lcd.print("RGB LED: RED");
+  delay(BOOT_DELAY_INTERVAL);
+  lcd.setCursor(j,3); j++;
+  lcd.print(".");  
+  delay(BOOT_DELAY_INTERVAL); 
   digitalWrite(LED_RGB_RED, ON);
-  delay(50);
-  digitalWrite(LED_UPDATE_INTERVAL, OFF);
-  delay(500);
-  
-  digitalWrite(LED_UPDATE_INTERVAL, ON);
-  lcd.setCursor(0,2);
-  lcd.print("RGB LED: RED");
-  digitalWrite(LED_RGB_GRN, ON);
-  delay(50);
-  digitalWrite(LED_UPDATE_INTERVAL, OFF);
-  delay(500);
-  
-  digitalWrite(LED_UPDATE_INTERVAL, ON);
-  lcd.setCursor(0,1);
-  lcd.print("RGB LED: BLUE");
-  digitalWrite(LED_RGB_BLUE, ON);
-  delay(50);
-  digitalWrite(LED_UPDATE_INTERVAL, OFF);
-  delay(500);
-  delay(500);
-  
-  digitalWrite(LED_RGB_RED, OFF);
   digitalWrite(LED_RGB_GRN, OFF);
+  lcd.setCursor(j,3); j++;
+  lcd.print(".");  
+  delay(BOOT_DELAY_INTERVAL); 
+  lcd.setCursor(j,3); j++;
+  lcd.print(".");  
+  delay(BOOT_DELAY_INTERVAL); 
+  digitalWrite(LED_RGB_GRN, ON);
   digitalWrite(LED_RGB_BLUE, OFF);
-  
-  lcd.clear();
-  
-  //------------------------------------------
-  
-  lcd.setCursor(0,0);
-  lcd.print("MicroWXStation");
-  lcd.setCursor(0,2);
-  lcd.print("v0.1 (HW rev 1)");
-  lcd.setCursor(0,1);
-  lcd.print("Tyler Jones (thj.me)");
-  lcd.setCursor(0,3);
-  lcd.print("Loading");  
-  for(int i=7;i<20;i++) {
+  lcd.setCursor(j,3); j++;
+  lcd.print(".");  
+  delay(BOOT_DELAY_INTERVAL); 
+  digitalWrite(LED_RGB_BLUE, ON);
+  lcd.setCursor(j,3); j++;
+  lcd.print(".");  
+  delay(BOOT_DELAY_INTERVAL / 2);
+  for(int i=j;i<20;i++) {
     lcd.setCursor(i,3);
     lcd.print(".");  
-    delay(200); 
+    delay(BOOT_DELAY_INTERVAL / 2); 
   }
-  delay(2000);
+  delay(BOOT_DELAY_INTERVAL);
   lcd.clear();
 }
 
@@ -331,39 +255,129 @@ void setup(void)
 void loop(void)
 {
  
-  UINT_DHT++;
-  if(UINT_DHT > UTHOLD_DHT) {
-    UINT_DHT= 0;
-    int chk = DHT.read22(DHT22_PIN);
-    switch (chk)
-    {
-      case DHTLIB_OK:  
-        //Serial.println("DHT22 - OK,\t");
-        break;
-      case DHTLIB_ERROR_CHECKSUM:
-        Serial.println("DHT22 Checksum err,\t");
-        lcd.print("DHT22 FAIL!");
-        delay(2000);
-        break;
-      case DHTLIB_ERROR_TIMEOUT:
-        Serial.println("DHT22 Time out err,\t");
-        lcd.print("DHT22 FAIL!");
-        delay(2000);
-        break;
-      default:
-        Serial.println("DHT22 Unknown err,\t");
-        lcd.print("DHT22 FAIL!");
-        delay(2000);
-        break;
+  if(!DisableDHT22) {
+    UINT_DHT++;
+    if(UINT_DHT > UTHOLD_DHT) {
+      UINT_DHT= 0;
+      int chk = DHT.read22(DHT22_PIN);
+      int DHT22ERR_COUNTER = 0;
+      switch (chk)
+      {
+        case DHTLIB_OK:  
+          //Serial.println("DHT22 - OK,\t");
+          break;
+        case DHTLIB_ERROR_CHECKSUM:
+          Serial.println("DHT22 Checksum error!");
+          lcdprint("DHT22 CKSUM FAIL!", -1);
+          lcdprint("Hold MENU to disable", 1);
+          for(int i=0;i<800;i++) {
+            DHT22ERR_COUNTER = 0;
+            while(digitalRead(BTN_MENU) == HIGH && !DisableDHT22) {
+              DHT22ERR_COUNTER++;
+              if(DHT22ERR_COUNTER == 300) {
+                 DisableDHT22 = true;
+              }
+              delay(10);
+            }
+            if(DisableDHT22) {
+              i = 800;
+            } 
+            delay(10);
+          }
+          DHT22ERR_COUNTER = 0;
+          lcd.clear();
+          if(DisableDHT22) {
+            lcdprint("DHT22 Disabled!", -1);
+            lcdprint("Humidity/ExtTemp are", 1);
+            lcdprint("no longer available!", 2);
+          } else {
+            lcdprint("DHT22 Error Ignored!", -1);
+            lcdprint("Error will reoccur", 1); 
+            lcdprint("unless sensor fixed", 2); 
+            lcdprint("or disabled!", 3);                                     
+          }
+          delay(5000);
+          lcd.clear();
+          break;
+        case DHTLIB_ERROR_TIMEOUT:
+          Serial.println("DHT22 Time out error!");
+          lcdprint("DHT22 TIMEOUT ERR!", -1);
+          for(int i=0;i<800;i++) {
+            DHT22ERR_COUNTER = 0;
+            while(digitalRead(BTN_MENU) == HIGH && !DisableDHT22) {
+              DHT22ERR_COUNTER++;
+              if(DHT22ERR_COUNTER == 300) {
+                 DisableDHT22 = true;
+              }
+              delay(10);
+            }
+            if(DisableDHT22) {
+              i = 800;
+            } 
+            delay(10);
+          }
+          DHT22ERR_COUNTER = 0;
+          lcd.clear();
+          if(DisableDHT22) {
+            lcdprint("DHT22 Disabled!", -1);
+            lcdprint("Humidity/ExtTemp are", 1);
+            lcdprint("no longer available!", 2);
+          } else {
+            lcdprint("DHT22 Error Ignored!", -1);
+            lcdprint("Error will reoccur", 1); 
+            lcdprint("unless sensor fixed", 2); 
+            lcdprint("or disabled!", 3);                                     
+          }
+          delay(5000);
+          lcd.clear();
+          break;
+        default:
+          Serial.println("DHT22 Unknown error!");
+          lcdprint("DHT22 UNKNOWN ERR!", -1);
+          for(int i=0;i<800;i++) {
+            DHT22ERR_COUNTER = 0;
+            while(digitalRead(BTN_MENU) == HIGH && !DisableDHT22) {
+              DHT22ERR_COUNTER++;
+              if(DHT22ERR_COUNTER == 300) {
+                 DisableDHT22 = true;
+              }
+              delay(10);
+            }
+            if(DisableDHT22) {
+              i = 800;
+            } 
+            delay(10);
+          }
+          DHT22ERR_COUNTER = 0;
+          lcd.clear();
+          if(DisableDHT22) {
+            lcdprint("DHT22 Disabled!", -1);
+            lcdprint("Humidity/ExtTemp are", 1);
+            lcdprint("no longer available!", 2);
+          } else {
+            lcdprint("DHT22 Error Ignored!", -1);
+            lcdprint("Error will reoccur", 1); 
+            lcdprint("unless sensor fixed", 2); 
+            lcdprint("or disabled!", 3);                                   
+          }
+          delay(5000);
+          lcd.clear();
+          break;
+      }
     }
   }
-  
-  T.dht_c = (float)DHT.temperature;
-  T.dht_f = Fahrenheit((double)DHT.temperature);
+  if(DisableDHT22) {
+    T.dht_c = -99;
+    T.dht_f = -99;
+    humidity = -99;
+  } else {
+    T.dht_c = (float)DHT.temperature;
+    T.dht_f = Fahrenheit((double)DHT.temperature);
+    humidity = DHT.humidity;
+  }
   T.bmp_c = (float)bmp.readTemperature();
   T.bmp_f = Fahrenheit((double)bmp.readTemperature());
   temperature = (double)T.dht_c;
-  humidity = DHT.humidity;
   pressure = (float)bmp.readPressure() / 100;
   altitude = (float)bmp.readAltitude();
   dewpoint = dewPointFast(T.dht_c, humidity);
@@ -433,13 +447,12 @@ void loop(void)
       Buttons_Pressed_Time = millis(); 
     }
     if(millis() - Buttons_Pressed_Time > BTN_PRESSHOLD_DUR) {
-      lcd.clear();
-      lcd.print("Simultaneus Btn");
-      lcd.print("Press!!");
+      lcdprint("Simultaneus Btn", -1);
+      lcdprint("Press!!", 1);
       delay(2000);
     }
   } else { 
-    if(btnSelect_S != btnSelect_lastS) {
+    if(btnSelect_S != btnSelect_LS) {
       if(btnSelect_S == HIGH) {
         Serial.println("Select Button PRESSED!");
         LCD_curView = AllWeatherData;
@@ -447,15 +460,15 @@ void loop(void)
         Serial.println("Select Button RELEASED!");
       }
     }
-    if(btnMenu_S != btnMenu_lastS) {
+    if(btnMenu_S != btnMenu_LS) {
       if(btnMenu_S == HIGH) {
         Serial.println("Menu Button PRESSED!");
        } else {
         Serial.println("Menu Button RELEASED!");
        }
       }
-    btnMenu_lastS = btnMenu_S;
-    btnSelect_lastS = btnSelect_S;
+    btnMenu_LS = btnMenu_S;
+    btnSelect_LS = btnSelect_S;
   }
   
   // LCD Buttons Handling
@@ -465,22 +478,22 @@ void loop(void)
     Buttons_Pressed_Time = 0; 
   }
   if(btnDown_S == HIGH || btnUp_S == HIGH) { 
-    if(btnDown_S != btnDown_lastS) {
+    if(btnDown_S != btnDown_LS) {
       if(btnDown_S == HIGH) {
         Serial.println("Down Button PRESSED!");
       } else {
         Serial.println("Down Button RELEASED!");
       }
     }
-    if(btnUp_S != btnUp_lastS) {
+    if(btnUp_S != btnUp_LS) {
       if(btnUp_S == HIGH) {
         Serial.println("Up Button PRESSED!");
        } else {
         Serial.println("Up Button RELEASED!");
        }
       }
-    btnUp_lastS = btnUp_S;
-    btnDown_lastS = btnDown_S;
+    btnUp_LS = btnUp_S;
+    btnDown_LS = btnDown_S;
   }
 
   //Wait until LCD update interval to update the LCD
@@ -503,31 +516,29 @@ void loop(void)
     }
   }
   
-  UINT_SD++;
-   if(UINT_SD > UTHOLD_SD) {
-    //Create Data string for storing to SD card
-    //We will use CSV Format  
-    String dataString = String(id) + ", " + String((int)(T.dht_c*100)) + ", " + String((int)humidity) + ", " + String((int)(pressure*10)) + ", " + String((int)(dewPointFast(T.dht_c, humidity)*100)); 
-    
-    //Open a file to write to
-    //Only one file can be open at a time
-    File logFile = SD.open("LOG.csv", FILE_WRITE);
-    if (logFile)
-    {
-      logFile.println(dataString);
-      logFile.close();
+  if(SDENABLE) {
+    UINT_SD++;
+     if(UINT_SD > UTHOLD_SD) {
+      //Create Data string for storing to SD card
+      //We will use CSV Format  
+      String dataString = String(id) + ", " + String((int)(T.dht_c*10)) + ", " + String((int)humidity) + ", " + String((long)(pressure)) + ", " + String((int)dewPoint(T.dht_c, humidity)); 
       Serial.println(dataString);
-    }
-    else
-    {
-      
-      Serial.println("Couldn't open log file");
-    }
-    
-    //Increment ID number
-    id++; 
-   }
-  delay(50);
+      //Open a file to write to
+      //Only one file can be open at a time
+      File logFile = SD.open("LOG.CSV", FILE_WRITE);
+      if (logFile)
+      {
+        logFile.println(dataString);
+        logFile.close();
+        Serial.println(dataString);
+      } else {
+        Serial.println("Couldn't open log file");
+      }
+      //Increment ID number
+      id++; 
+     }
+  }
+  delay(100);
 }
 
 void LCD_showAboutScreen() {
@@ -539,25 +550,17 @@ void LCD_MinMaxRecords() {
 }
 
 void LCD_showAllData() { // Show all current weather data on the infomation LCD (4x20)
-  lcd.clear();
-  lcd.setCursor(0,0);
-  lcd.print("Temp: ");
+  lcdprint("Temp: ", 0);
   lcd.print(temperature);
   lcd.write(0b11011111);
   lcd.print(UnitAbbr);
-  lcd.setCursor(0,2);
-  lcd.print("Pressure: ");
+  lcdprint("Pressure: ", 1);
   lcd.print((double)pressure);
   lcd.print("mb");
-  lcd.setCursor(0,1);
-  lcd.print("Humidity: ");
-  lcd.print(humidity);
-  lcd.print("%");
-  lcd.setCursor(0,3);
-  lcd.print("DewPoint: ");
-  lcd.print(dewpoint);
-  lcd.write(0b11011111);
-  lcd.print(UnitAbbr);
+  lcdprint("Humidity: ", 2);
+  if(DisableDHT22) {lcd.print("DISABLED"); } else { lcd.print(humidity); lcd.print("%"); }
+  lcdprint("DewPoint: ", 3);
+  if(DisableDHT22) {lcd.print("DISABLED"); } else { lcd.print(dewpoint); lcd.write(0b11011111); lcd.print(UnitAbbr); }
 }
 // ------------------------------------------------------------------------------
 // Metorlogical Calculation Functions
@@ -571,6 +574,7 @@ double Fahrenheit(double celsius)
 // dewPoint function NOAA
 double dewPoint(double celsius, double humidity)
 {
+        if(humidity < 0) { return -99; }
         double A0= 373.15/(273.15 + celsius);
         double SUM = -7.90298 * (A0-1);
         SUM += 5.02808 * log10(A0);
@@ -586,9 +590,47 @@ double dewPoint(double celsius, double humidity)
 // 5x faster than dewPoint()
 double dewPointFast(double celsius, double humidity)
 {
+        if(humidity < 0) { return -99; }
         double a = 17.271;
         double b = 237.7;
         double temp = (a * celsius) / (b + celsius) + log(humidity/100);
         double Td = (b * temp) / (a - temp);
         return Td;
+}
+
+// Print string to LCD on a specified line.
+// USAGE: lcdprint("Line text goes here", 0) 
+// Line number is between 0 and 3 or set to -1 to clear the LCD before printing
+// NOTE: The first line is line 0! Line 1 is the second line!
+void lcdprint(String msg) {
+  lcdprint(msg, 0);  
+}
+
+void lcdprint(String msg, int line) {
+  if(line > 3) {
+    Serial.println("LCD line number is greater than the total available lines! Using line '0' instead...");
+    line = 0;
+  }
+  if(line < 0) {
+    lcd.clear();
+    line = 0;
+  } 
+  switch(line) {
+   case 0:
+    lcd.setCursor(0,0);
+    break;
+   case 1:
+    lcd.setCursor(0,1);
+    break;
+   case 2:
+    lcd.setCursor(0,2);
+    break;   
+   case 3:
+    lcd.setCursor(0,3);
+    break;
+   default:
+    lcd.setCursor(0,0);
+    break;
+  }
+  lcd.print(msg);
 }
