@@ -10,6 +10,15 @@
 #define OFF LOW
 #define SDENABLE false
 #define BOOT_DELAY_INTERVAL 400
+#define CHAR_DEGF 4
+#define CHAR_DEGC 3
+#define CHAR_UPARROW 1
+#define CHAR_DOWNARROW 2
+#define CHAR_MICRO 5
+#define RGB_OFF 0
+#define RGB_RED 1
+#define RGB_BLUE 2
+#define RGB_GRN 3
 
 // LCD (4x20) Configuration
 LiquidCrystal lcd(33, 31, 29, 27 ,25, 23, 32, 30, 28, 26);
@@ -22,9 +31,11 @@ static int MinHumidity = 100;
 static int MaxHumidity = 0;
 static double MinDewPoint = 120;
 static double MaxDewPoint = -100;
+static float MinAltitude = 10000;
+static float MaxAltitude = -1000;
 static int MinMaxToggle = 0;
 
-long id = 1;
+//long id = 1;
 static int loopCount = 0;
 
 // DHT22 Config
@@ -41,13 +52,16 @@ typedef struct {
   double bmp_f;    // BMP085 Temperature value (in Fahrenheit)
   double dht_f;    // DHT22 Temperature value (in Fahrenheit)
 } Temperature;
-  
+
+// Initialize the main WX data variables
 int humidity;       // % RH
 float pressure;     // In millibars
 double temperature; // In F or C dependng on SW_UNITS current state
 double dewpoint;    // Celcius
 float altitude;     // Altitude
-String UnitAbbr = " C";
+String TempUnitAbbr = " C";
+int TempUnitChar = CHAR_DEGC;
+String AltUnitAbbr = " ft";
 
 // Button Pins
 #define BTN_INC 24  // Increment
@@ -75,15 +89,17 @@ int btnSelect_LS = 0;
 int btnUp_LS = 0;
 int btnDown_LS = 0;
 int Buttons_Pressed_Time = 0; //Time in milliseconds
+
 //Enum for holding the current view for the GLCD
 enum CurrentLCDView {
   CurrentWXData,
   NonWXData,
-  MinMaxRecords,
+  MinMaxValues,
   AboutInfo,
   MainMenu
 };
-static int MainMenu_CursorPos = 0;
+static int MainMenu_CursorPos = 0; // The current position of the cursor in the Main Menu
+static int MinMax_ListShift = 0; // The current position of the list of values used to determine what value is listed first. 0 = Top of list
 
 static Temperature T;
 CurrentLCDView CurrentView = CurrentWXData;
@@ -115,6 +131,13 @@ const byte NES_A = B01111111;
 const byte NES_B = B10111111;
 static byte Last_NESData = 0;
 
+// LCD custom character definitions
+byte CharUpArrow[8] = { B00000, B00100, B01110, B11111, B00100, B00100, B00100, B00000 };
+byte CharDownArrow[8] = { B00000, B00100, B00100, B00100, B11111, B01110, B00100, B00000 };
+byte CharDegreeC[8] = { B01000, B10100, B01000, B00011, B00100, B00100, B00011, B00000 };
+byte CharDegreeF[8] = { B01000, B10100, B01000, B00011, B00100, B00111, B00100, B00000 };
+byte CharMicro[8] = { B00000, B00000, B00000, B10010, B10010, B10010, B11100, B10000 };
+
 // ------------------------------------------------------------------------------
 // setup() Core Function
 
@@ -144,6 +167,10 @@ void setup(void)
   // SD Card pin
   pinMode(53, OUTPUT);
 
+  // Initialize NES Controller
+  digitalWrite(NES_LATCH_PIN, HIGH);
+  digitalWrite(NES_CLK_PIN, HIGH);
+  
     // we'll use the initialization code from the utility libraries
   // since we're just testing if the card is working!
   if(SDENABLE) {
@@ -210,6 +237,11 @@ void setup(void)
   // Setup 4x20 LCD
   lcd.begin(20, 4);
   lcd.clear();
+  lcd.createChar(CHAR_UPARROW, CharUpArrow);
+  lcd.createChar(CHAR_DOWNARROW, CharDownArrow);
+  lcd.createChar(CHAR_DEGC, CharDegreeC);
+  lcd.createChar(CHAR_DEGF, CharDegreeF);
+  lcd.createChar(CHAR_MICRO, CharMicro);
   if (!bmp.begin()) { // Setup BMP085 Barometer
         lcdprint("Barometer FAIL!", -1);
 	Serial.println("*** No BMP085 barometer sensor found! Check wiring and try again! ***");
@@ -218,15 +250,11 @@ void setup(void)
         lcdprint("Syetem halted!",3);
 	while (1) { delay(10); }
   }
-  
-  // Initialize NES Controller
-  digitalWrite(NES_LATCH_PIN, HIGH);
-  digitalWrite(NES_CLK_PIN, HIGH);
-    
+       
   //------------------------------------------
   int j = 7;
-  lcdprint("MicroWXStation", 0);
-  lcdprint("v0.2.2 (HW rev 4)", 1);
+  lcdprint("MicroWXStation ", 0);
+  lcdprint("v0.2.4 (HW rev 4)", 1);
   lcdprint("By: Tyler H. Jones", 2);
   lcdprint("Loading", 3);
   // THe RGB LED is activated when LOW rather than HIGH
@@ -241,30 +269,32 @@ void setup(void)
   //------------------------------------------
   // Test LEDs
   SetStatusLED(-1);
+  SetLogLED(-1);
   lcd.setCursor(j,3); j++;
   lcd.print(".");  
   delay(BOOT_DELAY_INTERVAL);
-  SetStatusLED(1);
+  SetStatusLED(0);
+  SetLogLED(1);
   lcd.setCursor(j,3); j++;
   lcd.print(".");  
   delay(BOOT_DELAY_INTERVAL); 
-  digitalWrite(LED_RGB_RED, ON);
-  digitalWrite(LED_RGB_GRN, OFF);
+  SetLogLED(0);
+  RGBLEDState(RGB_GRN);
   lcd.setCursor(j,3); j++;
   lcd.print(".");  
   delay(BOOT_DELAY_INTERVAL); 
   lcd.setCursor(j,3); j++;
   lcd.print(".");  
   delay(BOOT_DELAY_INTERVAL); 
-  digitalWrite(LED_RGB_GRN, ON);
-  digitalWrite(LED_RGB_BLUE, OFF);
+  RGBLEDState(RGB_BLUE);
   lcd.setCursor(j,3); j++;
   lcd.print(".");  
   delay(BOOT_DELAY_INTERVAL); 
-  digitalWrite(LED_RGB_BLUE, ON);
+  RGBLEDState(RGB_RED);
   lcd.setCursor(j,3); j++;
   lcd.print(".");  
-  delay(BOOT_DELAY_INTERVAL / 2);
+  delay(BOOT_DELAY_INTERVAL);
+  RGBLEDState(RGB_OFF);
   for(int i=j;i<20;i++) {
     lcd.setCursor(i,3);
     lcd.print(".");  
@@ -273,13 +303,22 @@ void setup(void)
   delay(BOOT_DELAY_INTERVAL);
   lcd.clear();
 }
-
 // ------------------------------------------------------------------------------
 // loop() Core Function
 
 void loop(void)
 {
-  if(loopCount == 2) {
+  /*
+   * The delay for the loop funtion is set very low to allow for speedy button responses.
+   * However the delay is too short for the LCD to update properly and for the sensors to
+   * read data correctly. So to make everything work, there is a loopCounter that only lets 
+   * certain operations contained in loop() to ber performed after X number of loops. Thus
+   * effectivley lengthening the time between LCD and Data updates without comprimising 
+   * program speed and responsivness. 
+  */
+  loopCount++; // Increment aforementioned loopCounter
+
+  if(loopCount == 2 || loopCount == 4) { // Perform sensor updates every other loop
     if(!DisableDHT22) {
       DHT22Operations();
       T.dht_c = (float)DHT.temperature;
@@ -293,10 +332,24 @@ void loop(void)
     T.bmp_c = (float)bmp.readTemperature();
     T.bmp_f = Fahrenheit((double)bmp.readTemperature());
     pressure = (float)bmp.readPressure() / 100;
-    altitude = (float)bmp.readAltitude();
-    dewpoint = (digitalRead(SW_UNITS) == ON) ? dewPointFast(T.bmp_f, humidity) : dewPointFast(T.bmp_c, humidity);
+    altitude = (digitalRead(SW_UNITS) == ON) ? (float)bmp.readAltitude()*3.28084 : (float)bmp.readAltitude();
+    dewpoint = (digitalRead(SW_UNITS) == ON) ? dewPoint(T.bmp_f, humidity) : dewPoint(T.bmp_c, humidity);
     temperature = (digitalRead(SW_UNITS) == ON) ? (double)T.bmp_f : (double)T.bmp_c;
-    UnitAbbr = (digitalRead(SW_UNITS) == ON) ? "F" : "C"; 
+    TempUnitAbbr = (digitalRead(SW_UNITS) == ON) ? "F" : "C"; 
+    TempUnitChar = (digitalRead(SW_UNITS) == ON) ? CHAR_DEGF : CHAR_DEGC; 
+    AltUnitAbbr = (digitalRead(SW_UNITS) == ON) ? "ft" : "m";
+    
+    if(T.bmp_c > 0 && T.bmp_f < 100 && pressure >= 980) {
+       RGBLEDState(RGB_OFF);
+    } else if(pressure < 970) {
+      RGBLEDState(RGB_RED);
+    } else if(T.bmp_c <= 0) {
+       RGBLEDState(RGB_BLUE);
+    } else if(T.bmp_f >= 100) {
+       RGBLEDState(RGB_RED); 
+    } else if(pressure < 980) {
+      RGBLEDState(RGB_GRN); 
+    }
     
     if(T.bmp_f < MinTemperature) {
       MinTemperature = (digitalRead(SW_UNITS) == ON) ? (double)T.bmp_f : (double)T.bmp_c;
@@ -317,43 +370,21 @@ void loop(void)
       MaxHumidity = humidity;
     }
     if(dewpoint < MinDewPoint) {
-      MinDewPoint = dewpoint;
+      MinDewPoint = dewPointFast(T.bmp_c, humidity);
     }
     if(dewpoint > MaxDewPoint) {
-      MaxDewPoint = dewpoint;
+      MaxDewPoint = dewPointFast(T.bmp_c, humidity);
     }
-    /*
-    Serial.println("---> BMP085 Data <---");
-    Serial.print("Temperature: ");
-    Serial.print((double)(T.bmp_c));
-    Serial.print("C / ");
-    Serial.print(T.bmp_f);
-    Serial.println("F");
-    Serial.print("Pressure: ");
-    Serial.print((double)pressure);
-    Serial.println("mb");
-    Serial.print("Altitude: ");
-    Serial.print(bmp.readAltitude());
-    Serial.println("m");
-    Serial.println("---> DHT22 Data <---");
-    Serial.print("Temperature (DHT22): ");
-    Serial.print((double)T.dht_c);
-    Serial.print("C / ");
-    Serial.print(T.dht_f);
-    Serial.println("F");
-    Serial.print("Relative Humidity: ");
-    Serial.print(humidity);
-    Serial.println("%");
-    Serial.print("Dew Point: ");
-    Serial.print(dewpoint);
-    Serial.print("C / ");
-    Serial.print(Fahrenheit(dewpoint));
-    Serial.println("F");
-    */
-   loopCount = 0;
+    if(altitude < MinAltitude) {
+      MinAltitude = (float)bmp.readAltitude();
+    }
+    if(altitude > MaxAltitude) {
+      MaxAltitude = (float)bmp.readAltitude();
+    }
   }
-  loopCount++;
   
+  // Get data from the NES controller and trigger the cooresponding handler function
+  // Also debounce the buttons as they are read in the same manner as a hardware button would be
   byte NESData = GetNESData();
   if(NESData == NES_UP && Last_NESData != NES_UP) { // UP button
     Serial.println("NES UP button pressed");
@@ -376,62 +407,50 @@ void loop(void)
   } else if(NESData == NES_B && Last_NESData != NES_B) { // B button
     Serial.println("NES B button pressed");
   }
-  Last_NESData = NESData;
-  
-  int btnMenu_S = digitalRead(BTN_MENU);
-  int btnSelect_S = digitalRead(BTN_SELECT);
-  if(btnMenu_S == LOW || btnSelect_S == LOW) { 
+  Last_NESData = GetNESData();
+ 
+  // Check for hardware button state changes and trigger the cooresponding handler function
+  // Debouce the button presses before triggering an action.
+  if(digitalRead(BTN_MENU) == LOW || digitalRead(BTN_SELECT) == LOW) { 
     Buttons_Pressed_Time = 0; 
   }
-  if(btnMenu_S == HIGH && btnSelect_S == HIGH) { 
+  if(digitalRead(BTN_MENU) == HIGH && digitalRead(BTN_SELECT) == HIGH) { 
     if(Buttons_Pressed_Time == 0) { 
       Buttons_Pressed_Time = millis(); 
     }
     if(millis() - Buttons_Pressed_Time > BTN_PRESSHOLD_DUR) {
-      lcdprint("Simultaneus Btn", -1);
-      lcdprint("Press!!", 1);
+      lcdprint("Simultaneous", -1);
+      lcdprint("Button Press!", 1);
+      lcdprint("Menu + Select", 3);
       delay(2000);
     }
   } else { 
-    if(btnSelect_S != btnSelect_LS) {
-      if(btnSelect_S == HIGH) {
-        Serial.println("Select Button PRESSED!");
-        SelectBtnHandler();
-      }
+    if(digitalRead(BTN_SELECT) == HIGH && digitalRead(BTN_SELECT) != btnSelect_LS) {
+      Serial.println("Select Button PRESSED!");
+      SelectBtnHandler();
     }
-    if(btnMenu_S != btnMenu_LS) {
-      if(btnMenu_S == HIGH) {
-        MenuBtnHandler();
-        Serial.println("Menu Button PRESSED!");
-       }
-      }
-    btnMenu_LS = btnMenu_S;
-    btnSelect_LS = btnSelect_S;
+    if(digitalRead(BTN_MENU) == HIGH && digitalRead(BTN_MENU) != btnMenu_LS) {
+      MenuBtnHandler();
+      Serial.println("Menu Button PRESSED!");
+    }
+    btnMenu_LS = digitalRead(BTN_MENU);
+    btnSelect_LS = digitalRead(BTN_SELECT);
   }
-  
-  // LCD Buttons Handling
-  int btnDown_S = digitalRead(BTN_DEC);
-  int btnUp_S = digitalRead(BTN_INC);
-  if(btnDown_S == LOW && btnUp_S == LOW) { 
+  if(digitalRead(BTN_DEC) == LOW && digitalRead(BTN_INC) == LOW) { 
     Buttons_Pressed_Time = 0; 
   }
-    if(btnDown_S != btnDown_LS) {
-      if(btnDown_S == HIGH) {
-        Serial.println("Down Button PRESSED!");
-        DownBtnHandler();
-      }
-    }
-    if(btnUp_S != btnUp_LS) {
-      if(btnUp_S == HIGH) {
-        Serial.println("Up Button PRESSED!");
-        UpBtnHandler();
-       }
-      }
-    btnUp_LS = btnUp_S;
-    btnDown_LS = btnDown_S;
+  if(digitalRead(BTN_DEC) == HIGH && digitalRead(BTN_DEC) != btnDown_LS) {
+    Serial.println("Down Button PRESSED!");
+    DownBtnHandler();
+  }
+  if((digitalRead(BTN_INC) == HIGH && digitalRead(BTN_INC) != btnUp_LS)) {
+    Serial.println("Up Button PRESSED!");
+    UpBtnHandler();
+  }
+  btnUp_LS = digitalRead(BTN_INC);
+  btnDown_LS = digitalRead(BTN_DEC);
 
   //Wait until LCD update interval to update the LCD
-  if(loopCount == 2) {
     UINT_LCD++;
     if(UINT_LCD > UTHOLD_LCD) {
       UINT_LCD = 0;
@@ -439,8 +458,8 @@ void loop(void)
         case CurrentWXData:
           showCurrentWXData();
           break;
-        case MinMaxRecords:
-          showMinMaxRecords();
+        case MinMaxValues:
+          showMinMaxValues();
           break;
         case MainMenu:
           showMainMenu();
@@ -451,19 +470,49 @@ void loop(void)
         case NonWXData:
           showNonWXData();
           break;
-        default:
-          showCurrentWXData();
-          break;
       }
     } 
+  
+  if(loopCount == 4) {
+    // Send the current WX data to the serial port
+    Serial.println("----- BMP085 Data -----");
+    Serial.print("Temperature: ");
+    Serial.print((double)(T.bmp_c));
+    Serial.print("*C / ");
+    Serial.print(T.bmp_f);
+    Serial.println("*F");
+    Serial.print("Pressure: ");
+    Serial.print((double)pressure);
+    Serial.println("mb");
+    Serial.print("Altitude: ");
+    Serial.print(bmp.readAltitude());
+    Serial.println("m / ");
+    Serial.print(bmp.readAltitude()*3.28084);
+    Serial.println("ft");    
+    Serial.println("----- DHT22 Data -----");
+    Serial.print("Temperature (DHT22): ");
+    Serial.print((double)T.dht_c);
+    Serial.print("*C / ");
+    Serial.print(T.dht_f);
+    Serial.println("*F");
+    Serial.print("Relative Humidity: ");
+    Serial.print(humidity);
+    Serial.println("%");
+    Serial.print("Dew Point: ");
+    Serial.print(dewPointFast(T.bmp_c, humidity));
+    Serial.print("*C / ");
+    Serial.print(dewPointFast(T.bmp_f, humidity));
+    Serial.println("*F");
+    // Clear the loop counter
+    loopCount = 0; 
   }
   
   if(SDENABLE) {
     UINT_SD++;
-     if(UINT_SD > UTHOLD_SD) {
+    if(UINT_SD > UTHOLD_SD) {
       //Create Data string for storing to SD card
       //We will use CSV Format  
-      String dataString = String(id) + ", " + String((int)(T.dht_c*10)) + ", " + String((int)humidity) + ", " + String((long)(pressure)) + ", " + String((int)dewPoint(T.dht_c, humidity)); 
+      String dataString = String(millis()) + ", " + String((int)(T.dht_c*10)) + ", " + String((int)humidity) + ", " + String((long)(pressure)) + ", " + String((int)dewPoint(T.dht_c, humidity)); 
       Serial.println(dataString);
       //Open a file to write to
       //Only one file can be open at a time
@@ -476,9 +525,7 @@ void loop(void)
       } else {
         Serial.println("Couldn't open log file");
       }
-      //Increment ID number
-      id++; 
-     }
+    }
   }
   delay(50);
 }
@@ -486,46 +533,76 @@ void loop(void)
 
 void showAboutInfo() {
   lcdprint("MicroWXStation rev4", 0);
-  lcdprint("By: Tyler H. Jones", 1);
-  lcdprint("Software Ver 0.2.2", 2);
+  lcdprint("By: Tyler H. Jones", 2);
+  lcdprint("Software Ver 0.2.4", 1);
   lcdprint("Blog: tylerjones.me", 3);
 }
 
-void showMinMaxRecords() {
+void showMinMaxValues() {
   if(MinMaxToggle == 0) {
-    lcdprint("Max Temp: ", 0);
-    lcd.print(MaxTemperature);
-    lcd.write(0b11011111);
-    lcd.print(UnitAbbr);
-    lcd.print("   ");
-    lcdprint("Max Pres: ", 1);
+    if(MinMax_ListShift == 0) {
+      lcdprint("Max Temp: ", 0);
+      lcd.print(MaxTemperature);
+      lcd.write(0b11011111); // Degree symbol
+      lcd.print(TempUnitAbbr);
+      lcd.print("   ");
+    }
+    lcdprint("Max Pres: ", 1 - MinMax_ListShift);
     lcd.print((double)MaxPressure);
     lcd.print("mb ");
-    lcdprint("Max Hgm: ", 2);
+    lcdprint("Max Hgm: ", 2 - MinMax_ListShift);
     lcd.print(MaxHumidity); 
     lcd.print("%   ");
-    lcdprint("Max DP: ", 3);
-    lcd.print(MaxDewPoint); 
-    lcd.write(0b11011111); 
-    lcd.print(UnitAbbr); 
-    lcd.print("  ");
+    lcdprint("Max DP: ", 3 - MinMax_ListShift);
+    lcd.print((digitalRead(SW_UNITS) == ON) ? Fahrenheit(MaxDewPoint) : MaxDewPoint); 
+    lcd.write(0b11011111); // Degree symbol 
+    lcd.print(TempUnitAbbr); 
+    lcd.print("  ");    
+    if(MinMax_ListShift > 0) {
+      lcd.setCursor(19,0);
+      lcd.write(0b00011001);
+      lcd.setCursor(19,3);
+      lcd.print(" ");
+      lcdprint("Max Alt: ", 4 - MinMax_ListShift);
+      lcd.print((digitalRead(SW_UNITS) == ON) ? (MaxAltitude*3.28084) : MaxAltitude);
+      lcd.print(AltUnitAbbr);
+      lcd.print("  ");
+    } else {
+      lcd.setCursor(19,3);
+      lcd.write(0b00011000);
+    }
+    
   } else {
-    lcdprint("Min Temp: ", 0);
-    lcd.print(MinTemperature);
-    lcd.write(0b11011111);
-    lcd.print(UnitAbbr);
-    lcd.print("   ");
-    lcdprint("Min Pres: ", 1);
+    if(MinMax_ListShift == 0) {
+      lcdprint("Min Temp: ", 0);
+      lcd.print(MinTemperature);
+      lcd.write(0b11011111); // Degree symbol
+      lcd.print(TempUnitAbbr);
+      lcd.print("   ");
+    }
+    lcdprint("Min Pres: ", 1 - MinMax_ListShift);
     lcd.print((double)MinPressure);
     lcd.print("mb ");
-    lcdprint("Min Hgm: ", 2);
+    lcdprint("Min Hgm: ", 2 - MinMax_ListShift);
     lcd.print(MinHumidity); 
     lcd.print("%   ");
-    lcdprint("Min DP: ", 3);
-    lcd.print(MinDewPoint); 
-    lcd.write(0b11011111); 
-    lcd.print(UnitAbbr); 
-    lcd.print("  ");
+    lcdprint("Min DP: ", 3 - MinMax_ListShift);
+    lcd.print((digitalRead(SW_UNITS) == ON) ? Fahrenheit(MinDewPoint) : MinDewPoint); 
+    lcd.write(TempUnitChar); 
+    lcd.print("   ");
+    if(MinMax_ListShift > 0) {
+      lcd.setCursor(19,0);
+      lcd.write(CHAR_UPARROW);
+      lcd.setCursor(19,3);
+      lcd.print(" ");
+      lcdprint("Min Alt: ", 4 - MinMax_ListShift);
+      lcd.print((digitalRead(SW_UNITS) == ON) ? (MinAltitude*3.28084) : MinAltitude);
+      lcd.print(AltUnitAbbr);
+      lcd.print("  ");
+    } else {
+      lcd.setCursor(19,3);
+      lcd.write(CHAR_DOWNARROW);
+    }
   }
 }
 
@@ -541,20 +618,39 @@ void showMainMenu() {
 void showCurrentWXData() { // Show all current weather data on the infomation LCD (4x20)
   lcdprint("Temp: ", 0);
   lcd.print(temperature);
-  lcd.write(0b11011111);
-  lcd.print(UnitAbbr);
-  lcd.print(" ");
+  lcd.write(TempUnitChar); // Degree symbol 
+  lcd.print("  ");
   lcdprint("Pressure: ", 1);
   lcd.print((double)pressure);
   lcd.print("mb");
   lcdprint("Humidity: ", 2);
   if(DisableDHT22) {lcd.print("DISABLED"); } else { lcd.print(humidity); lcd.print("%"); }
   lcdprint("DewPoint: ", 3);
-  if(DisableDHT22) {lcd.print("DISABLED"); } else { lcd.print(dewpoint); lcd.write(0b11011111); lcd.print(UnitAbbr); lcd.print(" "); }
+  if(DisableDHT22) {lcd.print("DISABLED"); } else { lcd.print(dewpoint); lcd.write(TempUnitChar); lcd.print("  "); }
 }
 
 void showNonWXData() {
-  
+  lcdprint("Altitude: ", 0);
+  lcd.print((double)altitude);
+  lcd.print(AltUnitAbbr);
+  lcd.print("  ");
+  lcdprint("DHT Temp: ", 1);
+  lcd.print((digitalRead(SW_UNITS) == ON) ? (double)T.dht_f : (double)T.dht_c);
+  lcd.write(TempUnitChar);
+  lcd.print("  ");
+  lcdprint("BMP Temp: ", 2);
+  lcd.print((digitalRead(SW_UNITS) == ON) ? (double)T.bmp_f : (double)T.bmp_c);
+  lcd.write(TempUnitChar);
+  lcd.print("  ");
+  lcdprint("Uptime: ", 3);
+  float uptime = 0;
+  String timeunit = "";
+  if((millis()/1000/60) < 1) { uptime = (millis()/1000 ); timeunit = "sec"; }
+  else if((millis()/1000/60/60) < 1) { uptime = (float)(millis()/1000/60); timeunit = "min   "; }
+  else if((millis()/1000/60/60/24) < 1) { uptime = (float)(millis()/1000/60/60); timeunit = "hrs  "; }
+  else if((millis()/1000/60/60/24) >= 1) { uptime = (float)(millis()/1000/60/60/24); timeunit = "days  "; }
+  lcd.print((double)uptime);
+  lcd.print(timeunit);
 }
 // ------------------------------------------------------------------------------
 // Metorlogical Calculation Functions
@@ -630,6 +726,7 @@ void MenuBtnHandler() {
   if(CurrentView != MainMenu) {
     CurrentView = MainMenu;
     lcd.clear();
+    showMainMenu();
   }
 }
 
@@ -639,20 +736,31 @@ void SelectBtnHandler() {
       case 0:
         CurrentView = CurrentWXData;
         lcd.clear();
+        showCurrentWXData();
         break;
       case 1:
         CurrentView = NonWXData;
         lcd.clear();
+        showNonWXData();
         break;
       case 2:
-        CurrentView = MinMaxRecords;
+        CurrentView = MinMaxValues;
         lcd.clear();
+        showMinMaxValues();
         break;
       case 3:
         CurrentView = AboutInfo;
         lcd.clear();
+        showAboutInfo();
         break;
     }
+  }
+  if(CurrentView == MinMaxValues) {
+    if(MinMaxToggle == 0) {
+      MinMaxToggle = 1;
+    } else { 
+      MinMaxToggle = 0;
+    } 
   }
 }
 
@@ -664,12 +772,8 @@ void UpBtnHandler() {
        MainMenu_CursorPos--;
     }
   }
-  if(CurrentView == MinMaxRecords) {
-    if(MinMaxToggle == 0) {
-      MinMaxToggle = 1;
-    } else { 
-      MinMaxToggle = 0;
-    } 
+  if(CurrentView == MinMaxValues) {
+    if(MinMax_ListShift == 1) MinMax_ListShift--;
   }
 }
 
@@ -681,12 +785,8 @@ void DownBtnHandler() {
        MainMenu_CursorPos++;
     }
   }
-  if(CurrentView == MinMaxRecords) {
-    if(MinMaxToggle == 0) {
-      MinMaxToggle = 1;
-    } else { 
-      MinMaxToggle = 0;
-    } 
+  if(CurrentView == MinMaxValues) {
+    if(MinMax_ListShift < 1) MinMax_ListShift++;
   }
 }
 
@@ -748,11 +848,11 @@ void SetLogLED(int stat) {
 }
 
 void DHT22Operations() {
+  if(DisableDHT22) return;
   UINT_DHT++;
   if(UINT_DHT > UTHOLD_DHT) {
     UINT_DHT= 0;
     int chk = DHT.read22(DHT22_PIN);
-    int DHT22ERR_COUNTER = 0;
     switch (chk)
     {
       case DHTLIB_OK:
@@ -763,102 +863,79 @@ void DHT22Operations() {
         SetStatusLED(-1);
         Serial.println("DHT22 Checksum error!");
         lcdprint("DHT22 CKSUM FAIL!", -1);
-        lcdprint("Hold MENU to disable", 1);
-        for(int i=0;i<800;i++) {
-          DHT22ERR_COUNTER = 0;
-          while(digitalRead(BTN_MENU) == HIGH && !DisableDHT22) {
-            DHT22ERR_COUNTER++;
-            if(DHT22ERR_COUNTER == 300) {
-               DisableDHT22 = true;
-            }
-            delay(10);
-          }
-         if(DisableDHT22) {
-            i = 800;
-         } 
-          delay(10);
-       }
-       DHT22ERR_COUNTER = 0;
-       lcd.clear();
-       if(DisableDHT22) {
-          lcdprint("DHT22 Disabled!", -1);
-          lcdprint("Humidity/ExtTemp are", 1);
-          lcdprint("no longer available!", 2);
-        } else {
-          lcdprint("DHT22 Error Ignored!", -1);
-          lcdprint("Error will reoccur", 1); 
-          lcdprint("unless sensor fixed", 2); 
-          lcdprint("or disabled!", 3);                                     
-        }
-        delay(5000);
-        lcd.clear();
+        ShowDHT22Error();
         break;
       case DHTLIB_ERROR_TIMEOUT:
         SetStatusLED(-1);
         Serial.println("DHT22 Time out error!");
         lcdprint("DHT22 TIMEOUT ERR!", -1);
-        for(int i=0;i<800;i++) {
-          DHT22ERR_COUNTER = 0;
-          while(digitalRead(BTN_MENU) == HIGH && !DisableDHT22) {
-            DHT22ERR_COUNTER++;
-            if(DHT22ERR_COUNTER == 300) {
-               DisableDHT22 = true;
-            }
-            delay(10);
-          }
-          if(DisableDHT22) {
-            i = 800;
-          } 
-          delay(10);
-        }
-        DHT22ERR_COUNTER = 0;
-        lcd.clear();
-        if(DisableDHT22) {
-          lcdprint("DHT22 Disabled!", -1);
-          lcdprint("Humidity/ExtTemp are", 1);
-          lcdprint("no longer available!", 2);
-        } else {
-         lcdprint("DHT22 Error Ignored!", -1);
-          lcdprint("Error will reoccur", 1); 
-          lcdprint("unless sensor fixed", 2); 
-          lcdprint("or disabled!", 3);                                     
-        }
-        delay(5000);
-        lcd.clear();
+        ShowDHT22Error();
         break;
       default:
         SetStatusLED(-1);
         Serial.println("DHT22 Unknown error!");
         lcdprint("DHT22 UNKNOWN ERR!", -1);
-        for(int i=0;i<800;i++) {
-          DHT22ERR_COUNTER = 0;
-          while(digitalRead(BTN_MENU) == HIGH && !DisableDHT22) {
-            DHT22ERR_COUNTER++;
-            if(DHT22ERR_COUNTER == 300) {
-               DisableDHT22 = true;
-            }
-            delay(10);
-          }
-          if(DisableDHT22) {
-            i = 800;
-          } 
-          delay(10);
-        }
-        DHT22ERR_COUNTER = 0;
-        lcd.clear();
-        if(DisableDHT22) {
-          lcdprint("DHT22 Disabled!", -1);
-          lcdprint("Humidity/ExtTemp are", 1);
-          lcdprint("no longer available!", 2);
-        } else {
-          lcdprint("DHT22 Error Ignored!", -1);
-          lcdprint("Error will reoccur", 1); 
-          lcdprint("unless sensor fixed", 2); 
-          lcdprint("or disabled!", 3);                                   
-        }
-        delay(5000);
-        lcd.clear();
+        ShowDHT22Error();
         break;
     }
   }
+}
+
+void ShowDHT22Error() {
+  int DHT22ERR_COUNTER = 0;
+  lcdprint("Hold MENU to disable", 1);
+  for(int i=0;i<800;i++) {
+    DHT22ERR_COUNTER = 0;
+    while(digitalRead(BTN_MENU) == HIGH && !DisableDHT22) {
+      DHT22ERR_COUNTER++;
+      if(DHT22ERR_COUNTER == 300) {
+        DisableDHT22 = true;
+        SetStatusLED(0);
+      }
+      delay(10);
+    }
+    if(DisableDHT22) {
+      i = 800;
+    } 
+    delay(10);
+  }
+  DHT22ERR_COUNTER = 0;
+  lcd.clear();
+  if(DisableDHT22) {
+    lcdprint("DHT22 Disabled!", -1);
+    lcdprint("Humidity/ExtTemp are", 1);
+    lcdprint("no longer available!", 2);
+  } else {
+    lcdprint("DHT22 Error Ignored!", -1);
+    lcdprint("Error will reoccur", 1); 
+    lcdprint("unless sensor fixed", 2); 
+    lcdprint("or disabled!", 3);                                     
+  }
+  delay(5000);
+  lcd.clear();
+}
+
+void RGBLEDState(int color) {
+  switch(color) {
+    case RGB_OFF:
+      digitalWrite(LED_RGB_BLUE, HIGH);
+      digitalWrite(LED_RGB_GRN, HIGH);
+      digitalWrite(LED_RGB_RED, HIGH);
+      break;
+    case RGB_RED:
+      digitalWrite(LED_RGB_BLUE, HIGH);
+      digitalWrite(LED_RGB_GRN, HIGH);
+      digitalWrite(LED_RGB_RED, LOW);
+      break;
+    case RGB_BLUE:
+      digitalWrite(LED_RGB_BLUE, LOW);
+      digitalWrite(LED_RGB_GRN, HIGH);
+      digitalWrite(LED_RGB_RED, HIGH);
+      break;
+    case RGB_GRN:
+      digitalWrite(LED_RGB_BLUE, HIGH);
+      digitalWrite(LED_RGB_GRN, LOW);
+      digitalWrite(LED_RGB_RED, HIGH);
+      break;      
+  } 
 }
