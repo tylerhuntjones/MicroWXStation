@@ -1,3 +1,4 @@
+#include "MicroWXStation.h"
 #include <string.h>
 #include <Wire.h>
 #include <dht.h>
@@ -6,6 +7,7 @@
 #include <SD.h>
 
 //General Definitions
+/*
 #define ON HIGH
 #define OFF LOW
 #define SDENABLE false
@@ -19,7 +21,7 @@
 #define RGB_RED 1
 #define RGB_BLUE 2
 #define RGB_GRN 3
-
+*/
 // LCD (4x20) Configuration
 LiquidCrystal lcd(33, 31, 29, 27 ,25, 23, 32, 30, 28, 26);
 
@@ -35,23 +37,14 @@ static float MinAltitude = 10000;
 static float MaxAltitude = -1000;
 static int MinMaxToggle = 0;
 
-//long id = 1;
 static int loopCount = 0;
 
 // DHT22 Config
-#define DHT22_PIN 7
+// #define DHT22_PIN 7
 dht DHT;
 
 // BMP085 COnfiguration
 Adafruit_BMP085 bmp;
-
-// Temperature typedef (Celcius and Fahrenheit)
-typedef struct {
-  float bmp_c;     // BMP085 Temperature value (in Celcius)
-  float dht_c;     // DHT22 Temperature value (in Celcius)
-  double bmp_f;    // BMP085 Temperature value (in Fahrenheit)
-  double dht_f;    // DHT22 Temperature value (in Fahrenheit)
-} Temperature;
 
 // Initialize the main WX data variables
 int humidity;       // % RH
@@ -64,6 +57,7 @@ int TempUnitChar = CHAR_DEGC;
 String AltUnitAbbr = " ft";
 
 // Button Pins
+/*
 #define BTN_INC 24  // Increment
 #define BTN_DEC 22  // Decrement
 #define BTN_MENU 34
@@ -79,9 +73,9 @@ String AltUnitAbbr = " ft";
 #define LED_RGB_RED 10
 #define LED_RGB_GRN 11
 #define LED_RGB_BLUE 12
-
+*/
 //Error handling variables
-boolean DisableDHT22 = false;
+static boolean DisableDHT22 = false;
 
 // Button debounce variables
 int btnMenu_LS = 0;
@@ -101,6 +95,14 @@ enum CurrentLCDView {
 static int MainMenu_CursorPos = 0; // The current position of the cursor in the Main Menu
 static int MinMax_ListShift = 0; // The current position of the list of values used to determine what value is listed first. 0 = Top of list
 
+// Temperature typedef (Celcius and Fahrenheit)
+typedef struct {
+  float bmp_c;     // BMP085 Temperature value (in Celcius)
+  float dht_c;     // DHT22 Temperature value (in Celcius)
+  double bmp_f;    // BMP085 Temperature value (in Fahrenheit)
+  double dht_f;    // DHT22 Temperature value (in Fahrenheit)
+} Temperature;
+
 static Temperature T;
 CurrentLCDView CurrentView = CurrentWXData;
 int UINT_LCD = 0;
@@ -117,9 +119,11 @@ SdFile root;
 const int chipSelect = 53;   
 
 // Setup NES Controller
+/*
 #define NES_LATCH_PIN 41
 #define NES_CLK_PIN 40
 #define NES_SER_PIN 42
+*/
 // NES contoller buttons
 const byte NES_UP = B11110111;
 const byte NES_DOWN = B11111011;
@@ -555,8 +559,7 @@ void showMinMaxValues() {
     lcd.print("%   ");
     lcdprint("Max DP: ", 3 - MinMax_ListShift);
     lcd.print((digitalRead(SW_UNITS) == ON) ? Fahrenheit(MaxDewPoint) : MaxDewPoint); 
-    lcd.write(0b11011111); // Degree symbol 
-    lcd.print(TempUnitAbbr); 
+    lcd.write(TempUnitChar); 
     lcd.print("  ");    
     if(MinMax_ListShift > 0) {
       lcd.setCursor(19,0);
@@ -576,8 +579,7 @@ void showMinMaxValues() {
     if(MinMax_ListShift == 0) {
       lcdprint("Min Temp: ", 0);
       lcd.print(MinTemperature);
-      lcd.write(0b11011111); // Degree symbol
-      lcd.print(TempUnitAbbr);
+      lcd.write(TempUnitChar);
       lcd.print("   ");
     }
     lcdprint("Min Pres: ", 1 - MinMax_ListShift);
