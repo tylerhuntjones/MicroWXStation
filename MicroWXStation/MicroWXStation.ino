@@ -56,8 +56,8 @@ String UnitAbbr = " C";
 
 // LED Pins
 #define LED_STS_OK 8 //Small green led
-//#define LED_STS_ERR  //Small red led
-#define LED_UPDATE_INTERVAL 9
+#define LED_STS_ERR 9  //Small red led
+#define LED_UPDATE_INTERVAL 6
 #define LED_RGB_RED 10
 #define LED_RGB_GRN 11
 #define LED_RGB_BLUE 12
@@ -73,7 +73,6 @@ int btnSelect_LS = 0;
 int btnUp_LS = 0;
 int btnDown_LS = 0;
 int Buttons_Pressed_Time = 0; //Time in milliseconds
-
 //Enum for holding the current view for the GLCD
 enum CurrentLCDView {
   AllWeatherData,
@@ -118,7 +117,7 @@ void setup(void)
   
   // Setup LED pins
   pinMode(LED_STS_OK, OUTPUT);
-  //pinMode(LED_STS_ERR, OUTPUT);
+  pinMode(LED_STS_ERR, OUTPUT);
   pinMode(LED_UPDATE_INTERVAL, OUTPUT);
   pinMode(LED_RGB_RED, OUTPUT);
   pinMode(LED_RGB_GRN, OUTPUT);
@@ -554,13 +553,14 @@ void LCD_showAllData() { // Show all current weather data on the infomation LCD 
   lcd.print(temperature);
   lcd.write(0b11011111);
   lcd.print(UnitAbbr);
+  lcd.print(" ");
   lcdprint("Pressure: ", 1);
   lcd.print((double)pressure);
   lcd.print("mb");
   lcdprint("Humidity: ", 2);
   if(DisableDHT22) {lcd.print("DISABLED"); } else { lcd.print(humidity); lcd.print("%"); }
   lcdprint("DewPoint: ", 3);
-  if(DisableDHT22) {lcd.print("DISABLED"); } else { lcd.print(dewpoint); lcd.write(0b11011111); lcd.print(UnitAbbr); }
+  if(DisableDHT22) {lcd.print("DISABLED"); } else { lcd.print(dewpoint); lcd.write(0b11011111); lcd.print(UnitAbbr); lcd.print(" "); }
 }
 // ------------------------------------------------------------------------------
 // Metorlogical Calculation Functions
