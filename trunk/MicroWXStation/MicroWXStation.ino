@@ -31,36 +31,11 @@
 #include <LiquidCrystal.h>
 #include <SD.h>
 
-/*
- * 
- * MicroWXStation for Arduino Mega 2560 r3 - Version 0.2.5 
- * Copyright (C) 2013, Tyler H. Jones (me@tylerjones.me)
- * http://tylerjones.me/
- * 
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * 
- * http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- * 
- * Filename: MicroWXStation.ino
- * 
- * Description: Main Arduino IDE sketch file. Contains the loop() and setup()
- * functions that the Arduino code is based around. Everything starts from here...
- *
- */
-
 // LCD (4x20) Configuration
 LiquidCrystal lcd(33, 31, 29, 27 ,25, 23, 32, 30, 28, 26); //RS, EN, D0, D1, D2, D3, D4, D5, D6, D7 (R/W -> Ground)
 
 static int loopCount = 0;
-
+static int loopCountSerial = 0; // Keep track of when to update the serial data.
 // DHT22 Config
 dht DHT;
 static boolean DisableDHT22 = false;
@@ -102,9 +77,9 @@ static int MinMax_ListShift = 0; // The current position of the list of values u
 
 CurrentLCDView CurrentView = CurrentWXData;
 int UINT_LCD = 0;
-static const int UTHOLD_LCD = 5;
+static const int UTHOLD_LCD = 20;
 int UINT_DHT = 0;
-static const int UTHOLD_DHT = 5;
+static const int UTHOLD_DHT = 15;
 int UINT_SD = 0;
 static const int UTHOLD_SD = 60;
 
@@ -294,7 +269,7 @@ void loop(void)
   */
   loopCount++; // Increment aforementioned loopCounter
 
-  if(loopCount == 2 || loopCount == 4) { // Perform sensor updates every other loop
+  if(loopCount >= 5) { // Perform sensor updates every other loop
     if(!DisableDHT22) {
       DHT22Operations();
       T.dht_c = (float)DHT.temperature;
@@ -357,6 +332,7 @@ void loop(void)
     if(altitude > MaxAltitude) {
       MaxAltitude = (float)bmp.readAltitude();
     }
+    loopCount = 0;
   }
   
   // Get data from the NES controller and trigger the cooresponding handler function
@@ -449,39 +425,30 @@ void loop(void)
       }
     } 
   
-  if(loopCount == 4) {
+  if(loopCountSerial == 100) {
     // Send the current WX data to the serial port
-    Serial.println("----- BMP085 Data -----");
-    Serial.print("Temperature: ");
+    Serial.print("[");
+    Serial.print((double)(T.dht_c));
+    delay(2);
+    Serial.print("|");
     Serial.print((double)(T.bmp_c));
-    Serial.print("*C / ");
-    Serial.print(T.bmp_f);
-    Serial.println("*F");
-    Serial.print("Pressure: ");
-    Serial.print((double)pressure);
-    Serial.println("mb");
-    Serial.print("Altitude: ");
-    Serial.print(bmp.readAltitude());
-    Serial.println("m / ");
-    Serial.print(bmp.readAltitude()*3.28084);
-    Serial.println("ft");    
-    Serial.println("----- DHT22 Data -----");
-    Serial.print("Temperature (DHT22): ");
-    Serial.print((double)T.dht_c);
-    Serial.print("*C / ");
-    Serial.print(T.dht_f);
-    Serial.println("*F");
-    Serial.print("Relative Humidity: ");
+    delay(2);
+    Serial.print("|");
     Serial.print(humidity);
-    Serial.println("%");
-    Serial.print("Dew Point: ");
-    Serial.print(dewPointFast(T.bmp_c, humidity));
-    Serial.print("*C / ");
-    Serial.print(dewPointFast(T.bmp_f, humidity));
-    Serial.println("*F");
-    // Clear the loop counter
-    loopCount = 0; 
+    delay(2);
+    Serial.print("|");    
+    Serial.print((double)pressure);
+    delay(2);
+    Serial.print("|");  
+    Serial.print(dewPoint(T.bmp_c, humidity));
+    delay(5);
+    Serial.print("|");
+    Serial.print((double)altitude);
+    delay(2);
+    Serial.print("]\n\r");   
+    loopCountSerial = 0;
   }
+  loopCountSerial++;
   
   if(SDENABLE) {
     UINT_SD++;
