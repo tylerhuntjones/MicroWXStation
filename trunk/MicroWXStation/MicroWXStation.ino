@@ -34,7 +34,7 @@
 // LCD (4x20) Configuration
 LiquidCrystal lcd(33, 31, 29, 27 ,25, 23, 32, 30, 28, 26); //RS, EN, D0, D1, D2, D3, D4, D5, D6, D7 (R/W -> Ground)
 
-static int loopCount = 0;
+static int loopCount = 10;
 static int loopCountSerial = 0; // Keep track of when to update the serial data.
 // DHT22 Config
 dht DHT;
@@ -64,6 +64,8 @@ static double MaxDewPoint = -100;
 static float MinAltitude = 10000;
 static float MaxAltitude = -1000;
 static int MinMaxToggle = 0;
+// Hazardous weather warnings
+static int FrostWarnLevel = 0;
 
 // Button debounce variables
 int btnMenu_LS = 0; // LS = "Last State"
@@ -76,9 +78,9 @@ static int MainMenu_CursorPos = 0; // The current position of the cursor in the 
 static int MinMax_ListShift = 0; // The current position of the list of values used to determine what value is listed first. 0 = Top of list
 
 CurrentLCDView CurrentView = CurrentWXData;
-int UINT_LCD = 0;
+int UINT_LCD = 20;
 static const int UTHOLD_LCD = 20;
-int UINT_DHT = 0;
+int UINT_DHT = 15;
 static const int UTHOLD_DHT = 15;
 int UINT_SD = 0;
 static const int UTHOLD_SD = 60;
@@ -205,7 +207,7 @@ void setup(void)
   //------------------------------------------
   int j = 7;
   lcdprint("MicroWXStation ", 0);
-  lcdprint("v0.2.4 (HW rev 4)", 1);
+  lcdprint("v0.2.5 (HW rev 4)", 1);
   lcdprint("By: Tyler H. Jones", 2);
   lcdprint("Loading", 3);
   // THe RGB LED is activated when LOW rather than HIGH
@@ -290,16 +292,35 @@ void loop(void)
     TempUnitChar = (digitalRead(SW_UNITS) == HIGH) ? CHAR_DEGF : CHAR_DEGC; 
     AltUnitAbbr = (digitalRead(SW_UNITS) == HIGH) ? "ft" : "m";
     
-    if(T.bmp_c > 0 && T.bmp_f < 100 && pressure >= 980) {
-       RGBLEDState(RGB_OFF);
+    //Turn on the RGB_BLUE LED if there is evidence of frost
+    if(dewPoint(T.bmp_c, humidity) < 0 && T.bmp_c < 0) {
+       if(dewPoint(T.bmp_c, humidity) >= T.bmp_c < 0) {
+         FrostWarnLevel = 2;
+         RGBLEDState(RGB_BLUE);
+       } else {
+         FrostWarnLevel = 1;  
+         digitalWrite(LED_RGB_BLUE, HIGH);
+       }
+    } else { 
+      digitalWrite(LED_RGB_BLUE, HIGH);
+      FrostWarnLevel = 0;  
+    }
+    
+    if(T.bmp_c > 0) {
+      digitalWrite(LED_RGB_BLUE, HIGH); 
+      digitalWrite(LED_RGB_GRN, HIGH);       
+    } else if(T.bmp_f < 100 || pressure >= 980) {
+      digitalWrite(LED_RGB_RED, HIGH);
     } else if(pressure < 970) {
-      RGBLEDState(RGB_RED);
+      digitalWrite(LED_RGB_GRN, HIGH); 
+      digitalWrite(LED_RGB_RED, LOW); 
     } else if(T.bmp_c <= 0) {
-       RGBLEDState(RGB_BLUE);
+      digitalWrite(LED_RGB_BLUE, LOW); 
+      digitalWrite(LED_RGB_GRN, LOW); 
     } else if(T.bmp_f >= 100) {
-       RGBLEDState(RGB_RED); 
+      digitalWrite(LED_RGB_RED, LOW); 
     } else if(pressure < 980) {
-      RGBLEDState(RGB_GRN); 
+      digitalWrite(LED_RGB_GRN, LOW); 
     }
     
     if(T.bmp_f < MinTemperature) {

@@ -27,7 +27,7 @@
 void showAboutInfo() {
   lcdprint("MicroWXStation rev4", 0);
   lcdprint("By: Tyler H. Jones", 2);
-  lcdprint("Software Ver 0.2.4", 1);
+  lcdprint("Software Ver 0.2.5", 1);
   lcdprint("Blog: tylerjones.me", 3);
 }
 
@@ -118,6 +118,13 @@ void showCurrentWXData() { // Show all current weather data on the infomation LC
   if(DisableDHT22) {lcd.print("DISABLED"); } else { lcd.print(humidity); lcd.print("%"); }
   lcdprint("DewPoint: ", 3);
   if(DisableDHT22) {lcd.print("DISABLED"); } else { lcd.print(dewpoint); lcd.write(TempUnitChar); lcd.print("  "); }
+  if(FrostWarnLevel == 1) {
+    lcd.setCursor(19,3);
+    lcd.print("!"); 
+  } else if(FrostWarnLevel > 1) {
+    lcd.setCursor(18,3);
+    lcd.print("!!"); 
+  }
 }
 
 void showNonWXData() {

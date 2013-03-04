@@ -44,6 +44,7 @@
 #define RGB_RED 1
 #define RGB_BLUE 2
 #define RGB_GRN 3
+#define RGB_BLUEGRN 4
 // Button Pins
 #define BTN_INC 24  // Increment
 #define BTN_DEC 22  // Decrement
@@ -195,7 +196,12 @@ void RGBLEDState(int color) {
       digitalWrite(LED_RGB_BLUE, HIGH);
       digitalWrite(LED_RGB_GRN, LOW);
       digitalWrite(LED_RGB_RED, HIGH);
-      break;      
+      break;  
+    case RGB_BLUEGRN:
+      digitalWrite(LED_RGB_BLUE, LOW);
+      digitalWrite(LED_RGB_GRN, LOW);
+      digitalWrite(LED_RGB_RED, HIGH);
+      break;        
   }
 }
 
