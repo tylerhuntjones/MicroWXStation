@@ -446,7 +446,7 @@ void loop(void)
       }
     } 
   
-  if(loopCountSerial == 100) {
+  if(loopCountSerial == 600) {
     // Send the current WX data to the serial port
     Serial.print("[");
     Serial.print((double)(T.dht_c));

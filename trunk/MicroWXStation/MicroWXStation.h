@@ -229,4 +229,25 @@ byte GetNESData() {
   return data;
 }
 
+
+// Get and set functions for MIN/MAX value storage in on-board Arduino EEPROM
+// This project uses the Arduino Mega 2650 r3 therefore has a 4096 Byte (4Kb) EEPROM 
+
+double getMaxTemp() {
+  
+}
+
+void setMaxTemp(double t) {
+  
+}
+
+float getPressure() {
+  
+}
+
+void setPressure(float p) {
+  
+}
+
+
 #endif /* MicoWXStation_h  */
