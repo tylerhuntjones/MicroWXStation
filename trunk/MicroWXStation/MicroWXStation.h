@@ -3,7 +3,7 @@
 
 /*
  * 
- * MicroWXStation for Arduino Mega 2560 r3 - Version 0.2.5 
+ * MicroWXStation for Arduino Mega 2560 r3 - Version 0.2.6 
  * Copyright (C) 2013, Tyler H. Jones (me@tylerjones.me)
  * http://tylerjones.me/
  * 
@@ -30,7 +30,7 @@
  
 #include "Arduino.h"
 
-//General Definitions
+// General Definitions
 #define SDENABLE false // Enable/disable SD card logging
 #define BOOT_DELAY_INTERVAL 400 // Delay (in ms) between boot up checks and hardware tests
 // Custom LCD Character code definitions
@@ -75,7 +75,21 @@ typedef struct {
   double dht_f;    // DHT22 Temperature value (in Fahrenheit)
 } Temperature;
 
-//Enum for holding the current view for the GLCD
+// Min/Max values struct for EEPROM storage
+struct MinMax_t {
+  double MinTemperature;
+  double MaxTemperature;
+  float MinPressure;
+  float MaxPressure;
+  int MinHumidity;
+  int MaxHumidity;
+  double MinDewPoint;
+  double MaxDewPoint;
+  float MinAltitude;
+  float MaxAltitude;
+} MinMax;
+
+// Enum for holding the current view for the GLCD
 enum CurrentLCDView {
   CurrentWXData,
   NonWXData,
@@ -132,7 +146,7 @@ double dewPointFast(double celsius, double humidity)
         return Td;
 }
 
-//Celsius to Fahrenheit conversion
+// Celsius to Fahrenheit conversion
 double Fahrenheit(double celsius)
 {
         return 1.8 * celsius + 32;
@@ -228,26 +242,5 @@ byte GetNESData() {
   }
   return data;
 }
-
-
-// Get and set functions for MIN/MAX value storage in on-board Arduino EEPROM
-// This project uses the Arduino Mega 2650 r3 therefore has a 4096 Byte (4Kb) EEPROM 
-
-double getMaxTemp() {
-  
-}
-
-void setMaxTemp(double t) {
-  
-}
-
-float getPressure() {
-  
-}
-
-void setPressure(float p) {
-  
-}
-
 
 #endif /* MicoWXStation_h  */

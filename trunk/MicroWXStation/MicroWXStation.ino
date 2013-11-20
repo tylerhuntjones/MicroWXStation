@@ -1,6 +1,6 @@
 /*
  * 
- * MicroWXStation for Arduino Mega 2560 r3 - Version 0.2.5 
+ * MicroWXStation for Arduino Mega 2560 r3 - Version 0.2.6 
  * Copyright (C) 2013, Tyler H. Jones (me@tylerjones.me)
  * http://tylerjones.me/
  * 
@@ -30,6 +30,8 @@
 #include <Wire.h>
 #include <LiquidCrystal.h>
 #include <SD.h>
+#include <EEPROM.h>
+#include "EEPROMAnything.h"
 
 // LCD (4x20) Configuration
 LiquidCrystal lcd(33, 31, 29, 27 ,25, 23, 32, 30, 28, 26); //RS, EN, D0, D1, D2, D3, D4, D5, D6, D7 (R/W -> Ground)
@@ -49,20 +51,10 @@ float pressure;     // In millibars
 double temperature; // In F or C dependng on SW_UNITS current state
 double dewpoint;    // Celcius
 float altitude;     // Altitude
-String TempUnitAbbr = " C";
+String TempUnitAbbr = "C";
 int TempUnitChar = CHAR_DEGC;
-String AltUnitAbbr = " ft";
+String AltUnitAbbr = "ft";
 static Temperature T;
-static double MinTemperature = 1000;
-static double MaxTemperature = -1000;
-static float MinPressure = 1100;
-static float MaxPressure = 900;
-static int MinHumidity = 100;
-static int MaxHumidity = 0;
-static double MinDewPoint = 120;
-static double MaxDewPoint = -100;
-static float MinAltitude = 10000;
-static float MaxAltitude = -1000;
 static int MinMaxToggle = 0;
 // Hazardous weather warnings
 static int FrostWarnLevel = 0;
@@ -124,8 +116,10 @@ void setup(void)
   digitalWrite(NES_LATCH_PIN, HIGH);
   digitalWrite(NES_CLK_PIN, HIGH);
   
-    // we'll use the initialization code from the utility libraries
-  // since we're just testing if the card is working!
+  // Read Min/Max values from EEPROM
+  EEPROM_readAnything(0, MinMax);
+  
+  // SD Card setup
   if(SDENABLE) {
     if (!card.init(SPI_QUARTER_SPEED, chipSelect)) {
       SetStatusLED(-1);
@@ -207,7 +201,7 @@ void setup(void)
   //------------------------------------------
   int j = 7;
   lcdprint("MicroWXStation ", 0);
-  lcdprint("v0.2.5 (HW rev 4)", 1);
+  lcdprint("v0.2.6 (HW rev 4)", 1);
   lcdprint("By: Tyler H. Jones", 2);
   lcdprint("Loading", 3);
   // THe RGB LED is activated when LOW rather than HIGH
@@ -272,15 +266,15 @@ void loop(void)
   loopCount++; // Increment aforementioned loopCounter
 
   if(loopCount >= 5) { // Perform sensor updates every other loop
-    if(!DisableDHT22) {
-      DHT22Operations();
+    DHT22Operations();
+    if(DisableDHT22) {
+      T.dht_c = -99;
+      T.dht_f = -99;
+      humidity = DHT.humidity;
+    } else {
       T.dht_c = (float)DHT.temperature;
       T.dht_f = Fahrenheit((double)DHT.temperature);
       humidity = DHT.humidity;
-    } else {
-      T.dht_c = -99;
-      T.dht_f = -99;
-      humidity = -99;
     }
     T.bmp_c = (float)bmp.readTemperature();
     T.bmp_f = Fahrenheit((double)bmp.readTemperature());
@@ -294,7 +288,7 @@ void loop(void)
     
     //Turn on the RGB_BLUE LED if there is evidence of frost
     if(dewPoint(T.bmp_c, humidity) < 0 && T.bmp_c < 0) {
-       if(dewPoint(T.bmp_c, humidity) >= T.bmp_c < 0) {
+       if(dewPoint(T.bmp_c, humidity) >= T.bmp_c) {
          FrostWarnLevel = 2;
          RGBLEDState(RGB_BLUE);
        } else {
@@ -323,35 +317,35 @@ void loop(void)
       digitalWrite(LED_RGB_GRN, LOW); 
     }
     
-    if(T.bmp_f < MinTemperature) {
-      MinTemperature = (digitalRead(SW_UNITS) == HIGH) ? (double)T.bmp_f : (double)T.bmp_c;
+    if(T.bmp_c < MinMax.MinTemperature) {
+      MinMax.MinTemperature = (double)T.bmp_c;
     }
-    if(T.bmp_f > MaxTemperature) {
-      MaxTemperature = (digitalRead(SW_UNITS) == HIGH) ? (double)T.bmp_f : (double)T.bmp_c;
+    if(T.bmp_c > MinMax.MaxTemperature) {
+      MinMax.MaxTemperature = (double)T.bmp_c;
     }
-    if(pressure < MinPressure) {
-      MinPressure = pressure;
+    if(pressure < MinMax.MinPressure) {
+      MinMax.MinPressure = pressure;
     }
-    if(pressure > MaxPressure) {
-      MaxPressure = pressure;
+    if(pressure > MinMax.MaxPressure) {
+      MinMax.MaxPressure = pressure;
     }
-    if(humidity < MinHumidity) {
-      MinHumidity = humidity;
+    if(humidity < MinMax.MinHumidity) {
+      MinMax.MinHumidity = humidity;
     }
-    if(humidity > MaxHumidity) {
-      MaxHumidity = humidity;
+    if(humidity > MinMax.MaxHumidity) {
+      MinMax.MaxHumidity = humidity;
     }
-    if(dewpoint < MinDewPoint) {
-      MinDewPoint = dewPointFast(T.bmp_c, humidity);
+    if(dewpoint < MinMax.MinDewPoint) {
+      MinMax.MinDewPoint = dewPointFast(T.bmp_c, humidity);
     }
-    if(dewpoint > MaxDewPoint) {
-      MaxDewPoint = dewPointFast(T.bmp_c, humidity);
+    if(dewpoint > MinMax.MaxDewPoint) {
+      MinMax.MaxDewPoint = dewPointFast(T.bmp_c, humidity);
     }
-    if(altitude < MinAltitude) {
-      MinAltitude = (float)bmp.readAltitude();
+    if(altitude < MinMax.MinAltitude) {
+      MinMax.MinAltitude = (float)bmp.readAltitude();
     }
-    if(altitude > MaxAltitude) {
-      MaxAltitude = (float)bmp.readAltitude();
+    if(altitude > MinMax.MaxAltitude) {
+      MinMax.MaxAltitude = (float)bmp.readAltitude();
     }
     loopCount = 0;
   }
@@ -360,25 +354,25 @@ void loop(void)
   // Also debounce the buttons as they are read in the same manner as a hardware button would be
   byte NESData = GetNESData();
   if(NESData == NES_UP && Last_NESData != NES_UP) { // UP button
-    Serial.println("NES UP button pressed");
+    //Serial.println("NES UP button pressed");
     UpBtnHandler();
   } else if(NESData == NES_DOWN && Last_NESData != NES_DOWN) { // DOWN button
-    Serial.println("NES DOWN button pressed");
+    //Serial.println("NES DOWN button pressed");
     DownBtnHandler();
   } else if(NESData == NES_LEFT && Last_NESData != NES_LEFT) { // LEFT button
-    Serial.println("NES LEFT button pressed");
+    //Serial.println("NES LEFT button pressed");
   } else if(NESData == NES_RIGHT && Last_NESData != NES_RIGHT) { // RIGHT button   
-    Serial.println("NES RIGHT button pressed");
+    //Serial.println("NES RIGHT button pressed");
   } else if(NESData == NES_SELECT && Last_NESData != NES_SELECT) { // SELECT button
-    Serial.println("NES SELECT button pressed");
+    //Serial.println("NES SELECT button pressed");
     SelectBtnHandler();
   } else if(NESData == NES_START && Last_NESData != NES_START) { // START button
-    Serial.println("NES START button pressed");
+    //Serial.println("NES START button pressed");
     MenuBtnHandler();
   } else if(NESData == NES_A && Last_NESData != NES_A) { // A button
-    Serial.println("NES A button pressed");
+    //Serial.println("NES A button pressed");
   } else if(NESData == NES_B && Last_NESData != NES_B) { // B button
-    Serial.println("NES B button pressed");
+    //Serial.println("NES B button pressed");
   }
   Last_NESData = GetNESData();
  
@@ -399,12 +393,10 @@ void loop(void)
     }
   } else { 
     if(digitalRead(BTN_SELECT) == HIGH && digitalRead(BTN_SELECT) != btnSelect_LS) {
-      Serial.println("Select Button PRESSED!");
       SelectBtnHandler();
     }
     if(digitalRead(BTN_MENU) == HIGH && digitalRead(BTN_MENU) != btnMenu_LS) {
       MenuBtnHandler();
-      Serial.println("Menu Button PRESSED!");
     }
     btnMenu_LS = digitalRead(BTN_MENU);
     btnSelect_LS = digitalRead(BTN_SELECT);
@@ -413,11 +405,9 @@ void loop(void)
     Buttons_Pressed_Time = 0; 
   }
   if(digitalRead(BTN_DEC) == HIGH && digitalRead(BTN_DEC) != btnDown_LS) {
-    Serial.println("Down Button PRESSED!");
     DownBtnHandler();
   }
   if((digitalRead(BTN_INC) == HIGH && digitalRead(BTN_INC) != btnUp_LS)) {
-    Serial.println("Up Button PRESSED!");
     UpBtnHandler();
   }
   btnUp_LS = digitalRead(BTN_INC);
@@ -446,27 +436,34 @@ void loop(void)
       }
     } 
   
-  if(loopCountSerial == 600) {
+  if(loopCountSerial == 100) {
     // Send the current WX data to the serial port
     Serial.print("[");
+    delay(2);
     Serial.print((double)(T.dht_c));
     delay(2);
     Serial.print("|");
+    delay(2);
     Serial.print((double)(T.bmp_c));
     delay(2);
     Serial.print("|");
+    delay(2);
     Serial.print(humidity);
     delay(2);
-    Serial.print("|");    
+    Serial.print("|");
+    delay(2);  
     Serial.print((double)pressure);
     delay(2);
-    Serial.print("|");  
+    Serial.print("|");
+    delay(2);  
     Serial.print(dewPoint(T.bmp_c, humidity));
     delay(5);
     Serial.print("|");
+    delay(2);
     Serial.print((double)altitude);
     delay(2);
-    Serial.print("]\n\r");   
+    Serial.print("]\n\r");
+    delay(2);   
     loopCountSerial = 0;
   }
   loopCountSerial++;
@@ -530,7 +527,7 @@ void ShowDHT22Error() {
 }
 
 void DHT22Operations() {
-  if(DisableDHT22) return;
+  //if(DisableDHT22) return;
   UINT_DHT++;
   if(UINT_DHT > UTHOLD_DHT) {
     UINT_DHT= 0;
@@ -538,26 +535,30 @@ void DHT22Operations() {
     switch (chk)
     {
       case DHTLIB_OK:
-        SetStatusLED(1); 
+        SetStatusLED(1);
+        DisableDHT22 = false; 
         //Serial.println("DHT22 - OK,\t");
         break;
       case DHTLIB_ERROR_CHECKSUM:
         SetStatusLED(-1);
         Serial.println("DHT22 Checksum error!");
-        lcdprint("DHT22 CKSUM FAIL!", -1);
-        ShowDHT22Error();
+        DisableDHT22 = true; 
+        //lcdprint("DHT22 CKSUM FAIL!", -1);
+        //ShowDHT22Error();
         break;
       case DHTLIB_ERROR_TIMEOUT:
         SetStatusLED(-1);
         Serial.println("DHT22 Time out error!");
-        lcdprint("DHT22 TIMEOUT ERR!", -1);
-        ShowDHT22Error();
+        DisableDHT22 = true; 
+        //lcdprint("DHT22 TIMEOUT ERR!", -1);
+        //ShowDHT22Error();
         break;
       default:
         SetStatusLED(-1);
         Serial.println("DHT22 Unknown error!");
-        lcdprint("DHT22 UNKNOWN ERR!", -1);
-        ShowDHT22Error();
+        DisableDHT22 = true; 
+        //lcdprint("DHT22 UNKNOWN ERR!", -1);
+        //ShowDHT22Error();
         break;
     }
   }

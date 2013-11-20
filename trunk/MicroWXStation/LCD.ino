@@ -1,7 +1,7 @@
 
 /*
  * 
- * MicroWXStation for Arduino Mega 2560 r3 - Version 0.2.5 
+ * MicroWXStation for Arduino Mega 2560 r3 - Version 0.2.6 
  * Copyright (C) 2013, Tyler H. Jones (me@tylerjones.me)
  * http://tylerjones.me/
  * 
@@ -27,7 +27,7 @@
 void showAboutInfo() {
   lcdprint("MicroWXStation rev4", 0);
   lcdprint("By: Tyler H. Jones", 2);
-  lcdprint("Software Ver 0.2.5", 1);
+  lcdprint("Software Ver 0.2.6", 1);
   lcdprint("Blog: tylerjones.me", 3);
 }
 
@@ -35,50 +35,49 @@ void showMinMaxValues() {
   if(MinMaxToggle == 0) {
     if(MinMax_ListShift == 0) {
       lcdprint("Max Temp: ", 0);
-      lcd.print(MaxTemperature);
-      lcd.write(0b11011111); // Degree symbol
-      lcd.print(TempUnitAbbr);
+      lcd.print((digitalRead(SW_UNITS) == HIGH) ? Fahrenheit(MinMax.MaxTemperature) : MinMax.MaxTemperature);
+      lcd.print(TempUnitChar);
       lcd.print("   ");
     }
     lcdprint("Max Pres: ", 1 - MinMax_ListShift);
-    lcd.print((double)MaxPressure);
+    lcd.print((double)MinMax.MaxPressure);
     lcd.print("mb ");
     lcdprint("Max Hgm: ", 2 - MinMax_ListShift);
-    lcd.print(MaxHumidity); 
+    lcd.print(MinMax.MaxHumidity); 
     lcd.print("%   ");
     lcdprint("Max DP: ", 3 - MinMax_ListShift);
-    lcd.print((digitalRead(SW_UNITS) == HIGH) ? Fahrenheit(MaxDewPoint) : MaxDewPoint); 
+    lcd.print((digitalRead(SW_UNITS) == HIGH) ? Fahrenheit(MinMax.MaxDewPoint) : MinMax.MaxDewPoint); 
     lcd.write(TempUnitChar); 
     lcd.print("  ");    
     if(MinMax_ListShift > 0) {
       lcd.setCursor(19,0);
-      lcd.write(0b00011001);
+      lcd.write(CHAR_UPARROW);
       lcd.setCursor(19,3);
       lcd.print(" ");
       lcdprint("Max Alt: ", 4 - MinMax_ListShift);
-      lcd.print((digitalRead(SW_UNITS) == HIGH) ? (MaxAltitude*3.28084) : MaxAltitude);
+      lcd.print((digitalRead(SW_UNITS) == HIGH) ? (MinMax.MaxAltitude*3.28084) : MinMax.MaxAltitude);
       lcd.print(AltUnitAbbr);
       lcd.print("  ");
     } else {
       lcd.setCursor(19,3);
-      lcd.write(0b00011000);
+      lcd.write(CHAR_DOWNARROW);
     }
     
   } else {
     if(MinMax_ListShift == 0) {
       lcdprint("Min Temp: ", 0);
-      lcd.print(MinTemperature);
+      lcd.print((digitalRead(SW_UNITS) == HIGH) ? Fahrenheit(MinMax.MinTemperature) : MinMax.MinTemperature);
       lcd.write(TempUnitChar);
       lcd.print("   ");
     }
     lcdprint("Min Pres: ", 1 - MinMax_ListShift);
-    lcd.print((double)MinPressure);
+    lcd.print((double)MinMax.MinPressure);
     lcd.print("mb ");
     lcdprint("Min Hgm: ", 2 - MinMax_ListShift);
-    lcd.print(MinHumidity); 
+    lcd.print(MinMax.MinHumidity); 
     lcd.print("%   ");
     lcdprint("Min DP: ", 3 - MinMax_ListShift);
-    lcd.print((digitalRead(SW_UNITS) == HIGH) ? Fahrenheit(MinDewPoint) : MinDewPoint); 
+    lcd.print((digitalRead(SW_UNITS) == HIGH) ? Fahrenheit(MinMax.MinDewPoint) : MinMax.MinDewPoint); 
     lcd.write(TempUnitChar); 
     lcd.print("   ");
     if(MinMax_ListShift > 0) {
@@ -87,7 +86,7 @@ void showMinMaxValues() {
       lcd.setCursor(19,3);
       lcd.print(" ");
       lcdprint("Min Alt: ", 4 - MinMax_ListShift);
-      lcd.print((digitalRead(SW_UNITS) == HIGH) ? (MinAltitude*3.28084) : MinAltitude);
+      lcd.print((digitalRead(SW_UNITS) == HIGH) ? (MinMax.MinAltitude*3.28084) : MinMax.MinAltitude);
       lcd.print(AltUnitAbbr);
       lcd.print("  ");
     } else {

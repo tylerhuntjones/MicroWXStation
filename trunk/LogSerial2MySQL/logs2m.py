@@ -1,4 +1,6 @@
 #!/usr/bin/python
+
+##PikesPeak SQL password for wxstation PW3EdmBSwefnJRE9
 VERSION="0.1"
 
 """
@@ -12,6 +14,15 @@ MySQL DB for accessing the WXData over the internet.
 import time, shelve, os, sys, random, logs2mconfig 
 import string, MySQLdb, threading, socket, shutil, serial
 
+pid = str(os.getpid())
+pidfile = "/tmp/logs2m.pid"
+
+if os.path.isfile(pidfile):
+    print "%s already exists, exiting" % pidfile
+    sys.exit()
+else:
+    file(pidfile, 'w').write(pid)
+
 BAUD = 9600 #Set Serial port Baud rate
 
 ## Validate config file
@@ -23,6 +34,7 @@ if config_response != "Error":
         conf[i] = v
     conf.close()
 else:
+    os.unlink(pidfile)
     sys.exit()
 
 ## Make the config dictionary
@@ -58,6 +70,7 @@ class mysql:
 	    self.running = True;
     	    print "*** MySQL Error %d: %s ***" % (e.args[0], e.args[1])
     	    print "*** FATAL: quitting ***"
+            os.unlink(pidfile)
     	    sys.exit(1)
     
     def execute(self, query):
@@ -152,9 +165,11 @@ if __name__ == '__main__':
             ser.open()
         except serial.SerialException, e:
             sys.stderr.write("Could not open serial port %s: %s\n" % (ser.portstr, e))
+            os.unlink(pidfile)
             sys.exit(1)
         readSerial();
     except (KeyboardInterrupt, SystemExit): # Wait for a keyboard interupt
         print "\n*** Received keyboard interrupt, quitting threads ***"
+        os.unlink(pidfile)
         sys.exit(0)
 

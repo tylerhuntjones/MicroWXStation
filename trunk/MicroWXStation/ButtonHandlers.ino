@@ -1,6 +1,6 @@
 /*
  * 
- * MicroWXStation for Arduino Mega 2560 r3 - Version 0.2.5 
+ * MicroWXStation for Arduino Mega 2560 r3 - Version 0.2.6 
  * Copyright (C) 2013, Tyler H. Jones (me@tylerjones.me)
  * http://tylerjones.me/
  * 
