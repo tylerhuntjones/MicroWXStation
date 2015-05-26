@@ -1,10 +1,7 @@
-#ifndef MicoWXStation_H
-#define MicoWXStation_H
-
 /*
  * 
- * MicroWXStation for Arduino Mega 2560 r3 - Version 0.2.6 
- * Copyright (C) 2013, Tyler H. Jones (me@tylerjones.me)
+ * MicroWXStation for Arduino Mega 2560 r3 - Version 0.3.0 
+ * Copyright (C) 2014, Tyler H. Jones (me@tylerjones.me)
  * http://tylerjones.me/
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,8 +22,11 @@
  * Contains variable declarations and vaule definitions along with other
  * static code that does not need to be in MicroWXStation.ino where it might
  * be changed.
- *
+ * 
  */
+ 
+#ifndef MicoWXStation_H
+#define MicoWXStation_H
  
 #include "Arduino.h"
 

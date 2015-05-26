@@ -34,7 +34,6 @@ if config_response != "Error":
         conf[i] = v
     conf.close()
 else:
-    os.unlink(pidfile)
     sys.exit()
 
 ## Make the config dictionary
@@ -70,7 +69,6 @@ class mysql:
 	    self.running = True;
     	    print "*** MySQL Error %d: %s ***" % (e.args[0], e.args[1])
     	    print "*** FATAL: quitting ***"
-            os.unlink(pidfile)
     	    sys.exit(1)
     
     def execute(self, query):
@@ -165,11 +163,9 @@ if __name__ == '__main__':
             ser.open()
         except serial.SerialException, e:
             sys.stderr.write("Could not open serial port %s: %s\n" % (ser.portstr, e))
-            os.unlink(pidfile)
             sys.exit(1)
         readSerial();
     except (KeyboardInterrupt, SystemExit): # Wait for a keyboard interupt
         print "\n*** Received keyboard interrupt, quitting threads ***"
-        os.unlink(pidfile)
         sys.exit(0)
 

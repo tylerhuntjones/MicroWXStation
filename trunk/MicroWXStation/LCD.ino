@@ -1,8 +1,7 @@
-
 /*
  * 
- * MicroWXStation for Arduino Mega 2560 r3 - Version 0.2.6 
- * Copyright (C) 2013, Tyler H. Jones (me@tylerjones.me)
+ * MicroWXStation for Arduino Mega 2560 r3 - Version 0.3.0 
+ * Copyright (C) 2014, Tyler H. Jones (me@tylerjones.me)
  * http://tylerjones.me/
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,8 +21,7 @@
  * Description: LCD functions for viewing data and navigating menus.
  *
  */
- 
- 
+  
 void showAboutInfo() {
   lcdprint("MicroWXStation rev4", 0);
   lcdprint("By: Tyler H. Jones", 2);

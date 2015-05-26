@@ -1,7 +1,7 @@
 /*
  * 
- * MicroWXStation for Arduino Mega 2560 r3 - Version 0.2.6 
- * Copyright (C) 2013, Tyler H. Jones (me@tylerjones.me)
+ * MicroWXStation for Arduino Mega 2560 r3 - Version 0.3.0 
+ * Copyright (C) 2016, Tyler H. Jones (me@tylerjones.me)
  * http://tylerjones.me/
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -270,7 +270,7 @@ void loop(void)
     if(DisableDHT22) {
       T.dht_c = -99;
       T.dht_f = -99;
-      humidity = DHT.humidity;
+      humidity = -99;
     } else {
       T.dht_c = (float)DHT.temperature;
       T.dht_f = Fahrenheit((double)DHT.temperature);
@@ -280,24 +280,30 @@ void loop(void)
     T.bmp_f = Fahrenheit((double)bmp.readTemperature());
     pressure = (float)bmp.readPressure() / 100;
     altitude = (digitalRead(SW_UNITS) == HIGH) ? (float)bmp.readAltitude()*3.28084 : (float)bmp.readAltitude();
-    dewpoint = (digitalRead(SW_UNITS) == HIGH) ? dewPoint(T.bmp_f, humidity) : dewPoint(T.bmp_c, humidity);
+    if(DisableDHT22) {
+       dewpoint = -99;
+    } else {
+       dewpoint = (digitalRead(SW_UNITS) == HIGH) ? dewPoint(T.bmp_f, humidity) : dewPoint(T.bmp_c, humidity);
+    }
     temperature = (digitalRead(SW_UNITS) == HIGH) ? (double)T.bmp_f : (double)T.bmp_c;
     TempUnitAbbr = (digitalRead(SW_UNITS) == HIGH) ? "F" : "C"; 
     TempUnitChar = (digitalRead(SW_UNITS) == HIGH) ? CHAR_DEGF : CHAR_DEGC; 
     AltUnitAbbr = (digitalRead(SW_UNITS) == HIGH) ? "ft" : "m";
     
     //Turn on the RGB_BLUE LED if there is evidence of frost
-    if(dewPoint(T.bmp_c, humidity) < 0 && T.bmp_c < 0) {
-       if(dewPoint(T.bmp_c, humidity) >= T.bmp_c) {
-         FrostWarnLevel = 2;
-         RGBLEDState(RGB_BLUE);
-       } else {
-         FrostWarnLevel = 1;  
-         digitalWrite(LED_RGB_BLUE, HIGH);
-       }
-    } else { 
-      digitalWrite(LED_RGB_BLUE, HIGH);
-      FrostWarnLevel = 0;  
+    if(!DisableDHT22) {
+      if(dewPoint(T.bmp_c, humidity) < 0 && T.bmp_c < 0) {
+         if(dewPoint(T.bmp_c, humidity) >= T.bmp_c) {
+           FrostWarnLevel = 2;
+           RGBLEDState(RGB_BLUE);
+         } else {
+           FrostWarnLevel = 1;  
+           digitalWrite(LED_RGB_BLUE, HIGH);
+         }
+      } else { 
+        digitalWrite(LED_RGB_BLUE, HIGH);
+        FrostWarnLevel = 0;  
+      }
     }
     
     if(T.bmp_c > 0) {
@@ -541,21 +547,21 @@ void DHT22Operations() {
         break;
       case DHTLIB_ERROR_CHECKSUM:
         SetStatusLED(-1);
-        Serial.println("DHT22 Checksum error!");
+        //Serial.println("DHT22 Checksum error!");
         DisableDHT22 = true; 
         //lcdprint("DHT22 CKSUM FAIL!", -1);
         //ShowDHT22Error();
         break;
       case DHTLIB_ERROR_TIMEOUT:
         SetStatusLED(-1);
-        Serial.println("DHT22 Time out error!");
+        //Serial.println("DHT22 Time out error!");
         DisableDHT22 = true; 
         //lcdprint("DHT22 TIMEOUT ERR!", -1);
         //ShowDHT22Error();
         break;
       default:
         SetStatusLED(-1);
-        Serial.println("DHT22 Unknown error!");
+        //Serial.println("DHT22 Unknown error!");
         DisableDHT22 = true; 
         //lcdprint("DHT22 UNKNOWN ERR!", -1);
         //ShowDHT22Error();
