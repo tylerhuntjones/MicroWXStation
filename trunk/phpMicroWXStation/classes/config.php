@@ -1,4 +1,4 @@
-<?
+<?php
 /*
  *
  * phpImgDump (php5-apache) Version 0.9.x Beta
@@ -21,15 +21,15 @@
 
 define('SCRIPT_NAME', 'WXStation');
 define('SITE_NAME', 'wxstation');
-define('SCRIPT_VERSION', '0.1');
+define('SCRIPT_VERSION', '0.2');
 
-define('SERVER_ROOT', '/var/www/wx/'); //Root directory of the website (same as the apache web root)
+define('SERVER_ROOT', '/var/www/html/wx/'); //Root directory of the website (same as the apache web root)
 
 //MySQL Server definitions
 define('SQLHOST',''); // The MySQL host IP/fqdn
-define('SQLLOGIN',''); // The MySQL login
-define('SQLPASS', ''); //The MySQL password
-define('SQLDB', ''); //The MySQL database to use
+define('SQLLOGIN','microwxstation'); // The MySQL login
+define('SQLPASS', 'FwFsRjhypmEAMJqV'); //The MySQL password
+define('SQLDB', 'microwxstation'); //The MySQL database to use
 define('SQLPORT', 3306); //The MySQL port to connect on
 define('SQLSOCK', '/var/run/mysqld/mysqld.sock');
 

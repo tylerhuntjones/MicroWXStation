@@ -1,4 +1,4 @@
-<?
+<?php
 /*
  *
  * phpImgDump (php5-apache) Version 0.9.x Beta

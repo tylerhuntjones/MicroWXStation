@@ -25,7 +25,7 @@ if(isset($_GET['span'])) {
 	$span = 24;
 }
 
-$DB->query("SELECT timestamp FROM log ORDER BY timestamp DESC LIMIT 1");
+$DB->query("SELECT time FROM data ORDER BY time DESC LIMIT 1");
 if($DB->record_count() < 1) { 
 	echo "No data returned from DB!";
 	die();
@@ -34,9 +34,9 @@ if($DB->record_count() < 1) {
 }
 
 if($span==24) {
-	$DB->query("SELECT timestamp, pressure FROM log WHERE timestamp>=($latest_timestamp-86400) ORDER BY timestamp ASC");
+	$DB->query("SELECT time, pressure FROM data WHERE time>=($latest_timestamp-86400) ORDER BY time ASC");
 	$raw_pressure_array = $DB->collect("pressure");
-	$raw_times_array = $DB->collect("timestamp");
+	$raw_times_array = $DB->collect("time");
 	$pressure_array = array();
 	$times_array = array();
 	for($i = 24; $i > 1; $i--) {
@@ -54,9 +54,9 @@ if($span==24) {
 		$times_array[$i] = gmdate("H:i", $times_array[$i]-18000);
 	}
 } elseif($span==12) {
-	$DB->query("SELECT timestamp, pressure FROM log WHERE timestamp>=$latest_timestamp-43200 ORDER BY timestamp ASC");
+	$DB->query("SELECT time, pressure FROM data WHERE time>=$latest_timestamp-43200 ORDER BY time ASC");
 	$raw_pressure_array = $DB->collect("pressure");
-	$raw_times_array = $DB->collect("timestamp");
+	$raw_times_array = $DB->collect("time");
 	$pressure_array = array();
 	$times_array = array();
 	for($i = 24; $i > 1; $i--) {
@@ -74,9 +74,9 @@ if($span==24) {
 		$times_array[$i] = gmdate("H:i", $times_array[$i]-18000);
 	}
 } elseif($span==6) {
-	$DB->query("SELECT timestamp, pressure FROM log WHERE timestamp>=$latest_timestamp-21600 ORDER BY timestamp ASC");
+	$DB->query("SELECT time, pressure FROM data WHERE time>=$latest_timestamp-21600 ORDER BY time ASC");
 	$raw_pressure_array = $DB->collect("pressure");
-	$raw_times_array = $DB->collect("timestamp");
+	$raw_times_array = $DB->collect("time");
 	$pressure_array = array();
 	$times_array = array();
 	for($i = 24; $i > 1; $i--) {
@@ -94,9 +94,9 @@ if($span==24) {
 		$times_array[$i] = gmdate("H:i", $times_array[$i]-18000);
 	}
 } elseif($span==1) {
-	$DB->query("SELECT timestamp, pressure FROM log WHERE timestamp>=$latest_timestamp-3600 ORDER BY timestamp ASC");
+	$DB->query("SELECT time, pressure FROM data WHERE time>=$latest_timestamp-3600 ORDER BY time ASC");
 	$raw_pressure_array = $DB->collect("pressure");
-	$raw_times_array = $DB->collect("timestamp");
+	$raw_times_array = $DB->collect("time");
 	$pressure_array = array();
 	$times_array = array();
 	for($i = 24; $i > 1; $i--) {

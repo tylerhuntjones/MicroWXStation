@@ -20,7 +20,7 @@
  */
 ?>
 
-<? 
+<?php
 error_reporting(E_ALL);
 ini_set('display_errors', true);
 require('classes/script_start.php'); 
@@ -35,29 +35,28 @@ if(isset($_GET['celcius'])) {
 
 
 //Get last record in log table
-$DB->query("SELECT timestamp, dht_temp, bmp_temp, humidity, pressure, dewpoint, altitude FROM log ORDER BY timestamp DESC LIMIT 1");
+$DB->query("SELECT time, tempf, humidity, pressure, dewpoint, heatindex FROM data ORDER BY time DESC LIMIT 1");
 if($DB->record_count() < 1) { 
 	echo "No data returned from DB!";
 	die();
 } else {
-	list($timestamp, $dht_temp, $bmp_temp, $humidity, $pressure, $dewpoint, $altitude) = $DB->next_record();
+	list($timestamp, $temp, $humidity, $pressure, $dewpoint, $heatindex) = $DB->next_record();
 }
 
 //Determine if WX values are rising or falling
 $num_greater = 0;
 $num_fewer = 0;
-$DB->query("SELECT dht_temp, bmp_temp, pressure, dewpoint FROM log ORDER BY timestamp DESC LIMIT 21");
+$DB->query("SELECT tempf, pressure, dewpoint FROM data ORDER BY time DESC LIMIT 21");
 //list($dht_temp_dir, $bmp_temp_dir, $perssure_dir, $dewpoint_dir) = $DB->next_record();
-$dht_temp_array = $DB->collect("dht_temp");
-$bmp_temp_array = $DB->collect("bmp_temp");
+$temp_array = $DB->collect("tempf");
 $pressure_array = $DB->collect("pressure");
 $dewpoint_array = $DB->collect("dewpoint");
-//DHT Temperature
+//Temperature
 for($i = 1; $i < 21; $i++) {
-	if($dht_temp_array[$i] < $dht_temp) {
+	if($temp_array[$i] < $temp) {
 		$num_fewer++;
 	}
-	if($dht_temp_array[$i] > $dht_temp) {
+	if($temp_array[$i] > $temp) {
 		$num_greater++;
 	}
 }
@@ -69,27 +68,6 @@ if($num_greater == $num_fewer) {
 	}
 	if($num_greater < $num_fewer) {
 		$dht_temp_dir = 1;
-	}
-}
-$num_fewer = 0;
-$num_greater = 0;
-//BMP Temperature
-for($i = 1; $i < 21; $i++) {
-	if($bmp_temp_array[$i] < $bmp_temp) {
-		$num_fewer++;
-	}
-	if($bmp_temp_array[$i] > $bmp_temp) {
-		$num_greater++;
-	}
-}
-if($num_greater == $num_fewer) {
-	$bmp_temp_dir = 0;
-} else {
-	if($num_greater > $num_fewer) {
-		$bmp_temp_dir = -1;
-	}
-	if($num_greater < $num_fewer) {
-		$bmp_temp_dir = 1;
 	}
 }
 $num_fewer = 0;
@@ -153,14 +131,9 @@ if($usec) {
       <td align="center">---</td>
    </tr>
    <tr>
-      <td align="right"><b>Temp 1</b></td>
-      <td align="left"><?=$usec?$dht_temp:CtoF($dht_temp)?> <?=$usec?'C':'F'?></td>
-      <td align="center"><?=getDirString($dht_temp_dir)?></td>
-   </tr>
-   <tr>
-      <td align="right"><b>Temp 2</b></td>
-      <td align="left"><?=$usec?$bmp_temp:CtoF($bmp_temp)?> <?=$usec?'C':'F'?></td>
-      <td align="center"><?=getDirString($bmp_temp_dir)?></td>
+      <td align="right"><b>Temp</b></td>
+      <td align="left"><?=$usec?FtoC($temp):$temp?> <?=$usec?'C':'F'?></td>
+      <td align="center"><?=getDirString($temp_dir)?></td>
    </tr>
    <tr>
       <td align="right"><b>Humidity</b></td>
@@ -174,12 +147,12 @@ if($usec) {
    </tr>
    <tr>
       <td align="right"><b>Dew Point</b></td>
-      <td align="left"><?=$usec?$dewpoint:CtoF($dewpoint)?> <?=$usec?'C':'F'?></td>
+      <td align="left"><?=$usec?FtoC($dewpoint):$dewpoint?> <?=$usec?'C':'F'?></td>
       <td align="center"><?=getDirString($dewpoint_dir)?></td>
    </tr>
    <tr>
-      <td align="right"><b>Altitude</b></td>
-      <td align="left"><?=$altitude?> ft</td>
+      <td align="right"><b>Heat Index</b></td>
+      <td align="left"><?=$heatindex?> ft</td>
       <td align="center">---</td>
    </tr>
 </table>

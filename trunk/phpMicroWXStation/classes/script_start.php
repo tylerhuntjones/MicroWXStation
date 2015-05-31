@@ -1,4 +1,4 @@
-<?
+<?php
 /*
  *
  * phpImgDump (php5-apache) Version 0.9.x Beta
@@ -92,6 +92,10 @@ function is_number($Str) {
 
 function CtoF($t) {
 	return ($t * 1.8) + 32;
+}
+
+function FtoC($t) {
+	return ($t - 32) / 1.8;
 }
 
 function getDirString($d) {

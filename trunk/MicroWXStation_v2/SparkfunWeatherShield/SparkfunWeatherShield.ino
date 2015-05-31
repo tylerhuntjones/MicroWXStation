@@ -123,7 +123,6 @@ void wspeedIRQ()
 void setup()
 {
   Serial.begin(9600);
-  Serial.println("Weather Shield Example");
 
   pinMode(STAT1, OUTPUT); //Status LED Blue
   pinMode(STAT2, OUTPUT); //Status LED Green
@@ -152,8 +151,6 @@ void setup()
 
   // turn on interrupts
   interrupts();
-
-  Serial.println("Weather Shield online!");
 
 }
 
@@ -201,8 +198,6 @@ void loop()
       rainHour[minutes] = 0; //Zero out this minute's rainfall amount
       windgust_10m[minutes_10m] = 0; //Zero out this minute's gust
     }
-
-    //Report all readings every second
     printWeather();
 
     digitalWrite(STAT1, LOW); //Turn off stat LED
@@ -257,17 +252,9 @@ void calcWeather()
 
   //Calc humidity
   humidity = myHumidity.readHumidity();
-  //float temp_h = myHumidity.readTemperature();
-  //Serial.print(" TempH:");
-  //Serial.print(temp_h, 2);
 
-  //Calc tempf from pressure sensor
   tempf = myPressure.readTempF();
-  //Serial.print(" TempP:");
-  //Serial.print(tempf, 2);
 
-  //Total rainfall for the day is calculated within the interrupt
-  //Calculate amount of rainfall for the last 60 minutes
   rainin = 0;  
   for(int i = 0 ; i < 60 ; i++)
     rainin += rainHour[i];
@@ -306,15 +293,10 @@ float get_light_level()
 float get_battery_level()
 {
   float operatingVoltage = analogRead(REFERENCE_3V3);
-
   float rawVoltage = analogRead(BATT);
-  
   operatingVoltage = 3.30 / operatingVoltage; //The reference voltage is 3.3V
-  
   rawVoltage = operatingVoltage * rawVoltage; //Convert the 0 to 1023 int to actual voltage on BATT pin
-  
   rawVoltage *= 4.90; //(3.9k+1k)/1k - multiple BATT voltage by the voltage divider to get actual system voltage
-  
   return(rawVoltage);
 }
 
@@ -376,38 +358,37 @@ void printWeather()
 {
   calcWeather(); //Go calc all the various sensors
 
-  Serial.println();
-  Serial.print("$,winddir=");
+  Serial.print("$,");
   Serial.print(winddir);
-  Serial.print(",windspeedmph=");
-  Serial.print(windspeedmph, 1);
-  Serial.print(",windgustmph=");
-  Serial.print(windgustmph, 1);
-  Serial.print(",windgustdir=");
-  Serial.print(windgustdir);
-  Serial.print(",windspdmph_avg2m=");
-  Serial.print(windspdmph_avg2m, 1);
-  Serial.print(",winddir_avg2m=");
-  Serial.print(winddir_avg2m);
-  Serial.print(",windgustmph_10m=");
-  Serial.print(windgustmph_10m, 1);
-  Serial.print(",windgustdir_10m=");
-  Serial.print(windgustdir_10m);
-  Serial.print(",humidity=");
-  Serial.print(humidity, 1);
-  Serial.print(",tempf=");
-  Serial.print(tempf, 1);
-  Serial.print(",rainin=");
-  Serial.print(rainin, 2);
-  Serial.print(",dailyrainin=");
-  Serial.print(dailyrainin, 2);
-  Serial.print(",pressure=");
-  Serial.print(pressure, 2);
-  Serial.print(",batt_lvl=");
-  Serial.print(batt_lvl, 2);
-  Serial.print(",light_lvl=");
-  Serial.print(light_lvl, 2);
   Serial.print(",");
-  Serial.println("#");
+  Serial.print(windspeedmph, 1);
+  Serial.print(",");
+  Serial.print(windgustmph, 1);
+  Serial.print(",");
+  Serial.print(windgustdir);
+  Serial.print(",");
+  Serial.print(windspdmph_avg2m, 1);
+  Serial.print(",");
+  Serial.print(winddir_avg2m);
+  Serial.print(",");
+  Serial.print(windgustmph_10m, 1);
+  Serial.print(",");
+  Serial.print(windgustdir_10m);
+  Serial.print(",");
+  Serial.print(humidity, 1);
+  Serial.print(",");
+  Serial.print(tempf, 1);
+  Serial.print(",");
+  //Serial.print(rainin, 2);
+  //Serial.print(",");
+  //Serial.print(dailyrainin, 2);
+  //Serial.print(",");
+  Serial.print(pressure, 2);
+  Serial.print(",");
+  //Serial.print(batt_lvl, 2);
+  //Serial.print(",");
+  Serial.print(light_lvl, 2);
+  Serial.print(",#");
+  Serial.println();
 
 }

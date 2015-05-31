@@ -32,19 +32,71 @@
 
 // General Definitions
 #define VIEW_HOME 0
-#define VIEW_MENU 1
-#define VIEW_MINMAX 2
-#define VIEW_ALL 3
-#define VIEW_WIND 4
+#define VIEW_MINMAX 1
+#define VIEW_ALL 2
+#define VIEW_WIND 3
+#define VIEW_MENU 10
+#define VIEW_ABOUT 11
+
+#define VIEW_TITLE_XPOS 6
+#define VIEW_TITLE_YPOS 220
+
+#define FRAME_R_COLOR 255
+#define FRAME_G_COLOR 255
+#define FRAME_B_COLOR 255
+#define FRAME_X_START 4
+#define FRAME_Y_START 5
+#define FRAME_X_END 315
+#define FRAME_Y_END 205
+#define HOME_DIV_X_START 160
+#define HOME_DIV_Y_START 35
+#define HOME_DIV_X_END 160
+#define HOME_DIV_Y_END 197
+
+#define WDIRIND_CENTER_X 240
+#define WDIRIND_CENTER_Y 140
+#define WDIRIND_RADIUS 45
+#define WDIRIND_LINE_LENGTH 50
+#define WDIRIND_W 185
+#define WDIRIND_NW 190
+#define WDIRIND_SW 190
+#define WDIRIND_E 295
+#define WDIRIND_NE 190
+#define WDIRIND_SE 190
+#define WDIRIND_N 240
+#define WDIRIND_S 240
+#define WDIRIND_NNW 190
+#define WDIRIND_SSW 190
+#define WDIRIND_NNE 190
+#define WDIRIND_SSE 190
+#define WDIRIND_WSW 190
+#define WDIRIND_WNW 190
+#define WDIRIND_ESE 190
+#define WDIRIND_ENE 190
+
+#define SD_CHIP_SELECT  53  // SD chip select pin
 
 // Typedef declarations
-// Temperature typedef (Celcius and Fahrenheit)
 typedef struct {
-  float bmp_c;     // BMP085 Temperature value (in Celcius)
-  float dht_c;     // DHT22 Temperature value (in Celcius)
-  double bmp_f;    // BMP085 Temperature value (in Fahrenheit)
-  double dht_f;    // DHT22 Temperature value (in Fahrenheit)
-} Temperature;
+  float TempF;
+  float TempC;
+  float Pressure;
+  float PressurePascals;
+  float Humidity;
+  float WindSpeed;
+  float WindGustSpeed;
+  int WindGustDir;
+  float WindSpeedAvg2M;
+  float WindSpeedAvg10M;
+  float WindGustSpeed10M;
+  int WindGustDir10M;
+  int WindDirection;
+  int WindDirAvg2M;
+  float LightLevel;
+  double BatteryLevel;
+  double Rainfall;
+  double DailyRainfall;
+} WXData;
 
 // Min/Max values struct for EEPROM storage
 struct MinMax_t {
@@ -56,18 +108,10 @@ struct MinMax_t {
   int MaxHumidity;
   double MinDewPoint;
   double MaxDewPoint;
-  float MinAltitude;
-  float MaxAltitude;
+  double MaxWind;
+  double MaxRain;
+  double MaxLight;
 } MinMax;
-
-// Enum for holding the current view for the GLCD
-enum CurrentLCDView {
-  CurrentWXData,
-  NonWXData,
-  MinMaxValues,
-  AboutInfo,
-  MainMenu
-};
 
 // ------------------------------------------------------------------------------
 // Metorlogical Calculation Functions
@@ -105,5 +149,10 @@ double Fahrenheit(double celsius)
         return 1.8 * celsius + 32;
 }
 
+// Celsius to Fahrenheit conversion
+double Celcius(double f)
+{
+        return (f - 32) / 1.8;
+}
 
 #endif /* MicoWXStation_v2_h  */
