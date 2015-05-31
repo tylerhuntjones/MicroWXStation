@@ -19,7 +19,7 @@
  */
 
 #include <Wire.h> //I2C needed for sensors
-#include "MPL3115A2.h" //Pressure sensor
+#include "SparkFunMPL3115A2.h" //Pressure sensor
 #include "HTU21D.h" //Humidity sensor
 
 MPL3115A2 myPressure; //Create an instance of the pressure sensor

@@ -25,26 +25,23 @@
  * 
  */
  
-#include <Wire.h>
-#include <SFE_BMP180.h>
-#include <MS5611.h>
-#include <DHT.h>
-#include <SD.h>
+#include "MicroWXStation_v2.h"
+#include <UTFT.h>
+#include <ITDB02_Touch.h>
+#include <UTFT_Buttons_ITDB.h>
 
-#define DHTPIN 13     // AM2302/1 Pin
-#define DHTTYPE DHT21   // DHT 22  (AM2302/1)
-#define SDENABLE true
+// Declare which fonts we will be using
+extern uint8_t SmallFont[];
+extern uint8_t BigFont[];
 
-// Typedef declarations
-// Temperature typedef (Celcius and Fahrenheit)
-typedef struct {
-  float bmp_c;     // BMP085 Temperature value (in Celcius)
-  float dht_c;     // DHT22 Temperature value (in Celcius)
-  double bmp_f;    // BMP085 Temperature value (in Fahrenheit)
-  double dht_f;    // DHT22 Temperature value (in Fahrenheit)
-  float ms_c;     // MS5611 Temperature value (in Celcius)
-  double ms_f;    // MS5611 Temperature value (in Fahrenheit)
-} Temperature;
+// Setup the TFT scree
+UTFT myGLCD(SSD1289,38,39,40,41);
+
+// Setup the touch screen
+ITDB02_Touch myTouch(6,5,4,3,2);
+
+// Set up UTFT_Buttons
+UTFT_Buttons  myButtons(&myGLCD, &myTouch);
 
 // Pressure typedef (mb)
 typedef struct {
@@ -52,18 +49,14 @@ typedef struct {
   float ms;     // DHT22 Temperature value (in Celcius)
 } Pressure;
 
-DHT dht(DHTPIN, DHTTYPE);
-SFE_BMP180 bmp;
-MS5611 ms5611;
-
 // set up variables using the SD utility library functions:
-Sd2Card card;
-SdVolume volume;
-SdFile root;
-const int chipSelect = 53;   
 
 static Temperature T;
 static Pressure P;
+
+static int curView; // Current view on the screen
+static bool redraw;     // Redraw the screen on next loop (data changed/button pressed)
+static int btnMenu, btnHome, btnMinMax, btnAll, btnWind, pressed_button;
 
 float humidity;     // % RH
 float pressure;     // In millibars
@@ -72,182 +65,128 @@ float heatindex;    // Heat index
 
 
 void setup() {
-  Serial.begin(9600); 
-  Serial.println("MicroWXStation Test!!");
-  // put your setup code here, to run once:
-  if (bmp.begin())
-    Serial.println("BMP180 init success");
-  else
-  {
-    Serial.println("BMP180 init fail\n\n");
-    //while(1); // Pause forever.
-  }
+  myGLCD.InitLCD();
+  myGLCD.clrScr();
+  myGLCD.setFont(SmallFont);
+
+  myTouch.InitTouch(1);
+  myTouch.setPrecision(PREC_MEDIUM);
   
-  while(!ms5611.begin())
-  {
-    Serial.println("Could not find a valid MS5611 sensor, check wiring!");
-    delay(500);
-  }
-  dht.begin();
+  myButtons.setTextFont(BigFont);
   
-  // SD Card pin
-  pinMode(53, OUTPUT);
-  
-  // SD Card setup
-  if(SDENABLE) {
-    if (!card.init(SPI_QUARTER_SPEED, chipSelect)) {
-      Serial.println("initialization failed. Things to check:");
-      Serial.println("* is a card is inserted?");
-      Serial.println("* Is your wiring correct?");
-      Serial.println("* did you change the chipSelect pin to match your shield or module?");
-      return;
-    } else {
-     Serial.println("Wiring is correct and a card is present.");
-    }
-   
-    // print the type of card
-    Serial.print("\nCard type: ");
-    switch(card.type()) {
-      case SD_CARD_TYPE_SD1:
-        Serial.println("SD1");
-        break;
-      case SD_CARD_TYPE_SD2:
-        Serial.println("SD2");
-        break;
-      case SD_CARD_TYPE_SDHC:
-        Serial.println("SDHC");
-        break;
-      default:
-        Serial.println("Unknown");
-    }
-   
-    // Now we will try to open the 'volume'/'partition' - it should be FAT16 or FAT32
-    if (!volume.init(card)) {
-      Serial.println("Could not find FAT16/FAT32 partition.\nMake sure you've formatted the card");
-      return;
-    }
-   
-    // print the type and size of the first FAT-type volume
-    long volumesize;
-    Serial.print("\nVolume type is FAT");
-    Serial.println(volume.fatType(), DEC);
-    Serial.println();
-   
-    volumesize = volume.blocksPerCluster();    // clusters are collections of blocks
-    volumesize *= volume.clusterCount();       // we'll have a lot of clusters
-    volumesize *= 512;                            // SD card blocks are always 512 bytes
-    Serial.print("Volume size (bytes): ");
-    Serial.println(volumesize);
-    Serial.print("Volume size (Kbytes): ");
-    volumesize /= 1024;
-    Serial.println(volumesize);
-    Serial.print("Volume size (Mbytes): ");
-    volumesize /= 1024;
-    Serial.println(volumesize);
-   
-    Serial.println("\nFiles found on the card (name, date and size in bytes): ");
-    root.openRoot(volume);
-   
-    // list all files in the card with date and size
-    root.ls(LS_R | LS_DATE | LS_SIZE);
-  } else {
-    Serial.println("SD card fail!"); 
-  }
+  myGLCD.print("MicroWXStation v2 - Booting...", 0, 5);
+  delay(1500);
+  myGLCD.print("Complete!", 0, 25);
+  delay(1000);
+  myGLCD.clrScr();
+  redraw = true; 
 }
 
 void loop() {
   char status;
   double Temp,Pres,p0,a;
-    
-  status = bmp.startTemperature();
-  if (status != 0)
-  {
-    delay(status);
-
-    status = bmp.getTemperature(Temp);
-    if (status != 0)
-    {
-      T.bmp_c = (float)Temp;
-      T.bmp_f = Fahrenheit((float)Temp);
-
-      status = bmp.startPressure(3);
-      if (status != 0)
-      {
-        delay(status);
-
-        status = bmp.getPressure(Pres,Temp);
-        if (status != 0)
-        {
-          P.bmp = (float)Pres / 100;
-        }
-        else Serial.println("error retrieving pressure measurement\n");
-      }
-      else Serial.println("error starting pressure measurement\n");
+  bool touch_wait = true;
+  int touch_wait_count = 0;
+  
+  if(redraw) {
+    myGLCD.clrScr();
+    switch(curView) {
+      case VIEW_HOME:
+        draw_Home();
+        break;
+      case VIEW_MENU:
+        draw_Menu();
+        break;
+      case VIEW_ALL:
+        draw_All();
+        break;
+      case VIEW_WIND:
+        draw_Wind();
+        break;
+      case VIEW_MINMAX:
+        draw_MinMax();
+        break;
+      default:
+        draw_Home();
+        break;
     }
-    else Serial.println("error retrieving temperature measurement\n");
+    redraw = false;
   }
-  else Serial.println("error starting temperature measurement\n");
+  
+  touch_wait_count = 0;
+  touch_wait = true;
+  
+  while(touch_wait) {
+    if (myTouch.dataAvailable() == true) {
+      pressed_button = myButtons.checkButtons();
 
-  // MS5611 Readings
-  T.ms_c = ms5611.readTemperature();
-  T.ms_f = Fahrenheit(T.ms_c);
-  P.ms = ms5611.readPressure();
-  
-  delay(10);
-  
-    // Reading temperature or humidity takes about 250 milliseconds!
-  // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
-  humidity = dht.readHumidity();
-  // Read temperature as Celsius
-  T.dht_c = (float)dht.readTemperature();
-  // Read temperature as Fahrenheit
-  T.dht_f = (float)dht.readTemperature(true);
-  
-  // Check if any reads failed and exit early (to try again).
-  if (isnan(humidity) || isnan(T.dht_c) || isnan(T.dht_f)) {
-    Serial.println("Failed to read from DHT sensor!");
-    delay(2000);
+      if(pressed_button == btnMenu) {
+          curView = VIEW_MENU;
+          redraw = true;
+          touch_wait = false;
+      }
+      if(pressed_button == btnHome) {
+        curView = VIEW_HOME;
+        redraw = true;
+        touch_wait = false;
+      }
+      if(pressed_button == btnAll) {
+        curView = VIEW_ALL;
+        redraw = true;
+        touch_wait = false;
+      }
+      if(pressed_button == btnWind) {
+        curView = VIEW_WIND;
+        redraw = true;
+        touch_wait = false;
+      }
+      if(pressed_button == btnMinMax) {
+        curView = VIEW_MINMAX;
+        redraw = true;
+        touch_wait = false;
+      }
+          
+    }
+    delay(1);
+    touch_wait_count++;
+    if(touch_wait_count > 2000) { // Exit the while loop to parse data, refresh screen, etc...
+        touch_wait = false;
+    }
   }
+}
 
-  // Compute heat index
-  // Must send in temp in Fahrenheit!
-  heatindex = dht.computeHeatIndex(T.dht_f, humidity);
+void draw_Home() {
+  // myButtons.addButton(X_POS, Y_POS, WIDTH, HEIGHT)
+  btnMenu = myButtons.addButton(0, 199, 100,  40, "Menu");
+  myButtons.drawButtons();
+  myGLCD.print("MicroWXStation v2", 110, 212);
   
-  delay(1000);
-  String dataString = String(String((int)(T.dht_c*10)) + ", " + String((int)humidity) + ", " + String((int)heatindex) + ", " + String((long)P.bmp) + ", " + String((long)P.ms) + ", " + String((int)dewPoint(T.dht_c, humidity))); 
-  Serial.println(dataString);
 }
 
-// dewPoint function NOAA
-double dewPoint(double celsius, double humidity)
-{
-        if(humidity < 0) { return -99; }
-        double A0= 373.15/(273.15 + celsius);
-        double SUM = -7.90298 * (A0-1);
-        SUM += 5.02808 * log10(A0);
-        SUM += -1.3816e-7 * (pow(10, (11.344*(1-1/A0)))-1) ;
-        SUM += 8.1328e-3 * (pow(10,(-3.49149*(A0-1)))-1) ;
-        SUM += log10(1013.246);
-        double VP = pow(10, SUM-3) * humidity;
-        double T = log(VP/0.61078);   // temp var
-        return (241.88 * T) / (17.558-T);
+void draw_MinMax() {
+  // myButtons.addButton(X_POS, Y_POS, WIDTH, HEIGHT)
+  btnHome = myButtons.addButton( 10,  20, 300,  30, "Home - Overview");
+  btnMinMax = myButtons.addButton( 10,  60, 300,  30, "Min/Max Values");
+  btnAll = myButtons.addButton( 10, 100, 300,  30, "All Data (Raw)");
+  btnWind = myButtons.addButton( 10, 140, 300,  30, "Wind View");
+  myButtons.drawButtons();
+  myGLCD.print("MENU - Make a selection!", 0, 200);
 }
 
-// delta max = 0.6544 wrt dewPoint()
-// 5x faster than dewPoint()
-double dewPointFast(double celsius, double humidity)
-{
-        if(humidity < 0) { return -99; }
-        double a = 17.271;
-        double b = 237.7;
-        double temp = (a * celsius) / (b + celsius) + log(humidity/100);
-        double Td = (b * temp) / (a - temp);
-        return Td;
+void draw_Menu() {
+  btnMenu = myButtons.addButton(0, 199, 100,  40, "Menu");
+  myButtons.drawButtons();
+  myGLCD.print("Min/Max Values", 110, 212);
 }
 
-// Celsius to Fahrenheit conversion
-double Fahrenheit(double celsius)
-{
-        return 1.8 * celsius + 32.0;
+void draw_Wind() {
+  btnMenu = myButtons.addButton(0, 199, 100,  40, "Menu");
+  myButtons.drawButtons();
+  myGLCD.print("Wind View", 110, 212);
 }
 
+void draw_All() {
+  btnMenu = myButtons.addButton(0, 199, 100,  40, "Menu");
+  myButtons.drawButtons();
+  myGLCD.print("All Data", 110, 212);
+}
